@@ -239,7 +239,8 @@
                                     <th class="px-4 py-3">Cost Code</th>
                                     <th class="px-4 py-3">Time In</th>
                                     <th class="px-4 py-3">Time Out</th>
-                                    <th class="px-4 py-3">Work Hrs</th>
+                                    <th class="px-4 py-3 text-emerald-700">Reg Hrs</th>
+                                    <th class="px-4 py-3 text-purple-700">OT Hrs</th>
                                     <th class="px-4 py-3">Notes</th>
                                     <th class="px-4 py-3 text-right">Actions</th>
                                 </tr>
@@ -637,14 +638,27 @@
                 filterBtn.disabled = true;
 
                 try {
-                    // Safe Range Query: No composite indexes required by Firebase for this!
-                    const qRef = query(collection(db, "timesheet_records"), where("dateStr", ">=", startStr), where("dateStr", "<=", endStr));
+                    // 1. Expand start date to the preceding Monday to calculate weekly limits accurately
+                    const getMonday = (dStr) => {
+                        const d = new Date(dStr + "T00:00:00");
+                        const day = d.getDay() || 7;
+                        d.setDate(d.getDate() - day + 1);
+                        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    };
+                    const expandedStart = getMonday(startStr);
+
+                    // 2. Fetch records starting from that Monday
+                    const qRef = query(collection(db, "timesheet_records"), where("dateStr", ">=", expandedStart), where("dateStr", "<=", endStr));
                     const snapshot = await getDocs(qRef);
                     
-                    this.adminRecords = [];
-                    snapshot.forEach(doc => this.adminRecords.push({ id: doc.id, ...doc.data() }));
+                    let rawRecords = [];
+                    snapshot.forEach(doc => rawRecords.push({ id: doc.id, ...doc.data() }));
                     
-                    // Sort descending locally to avoid index requirements
+                    // 3. Apply the rolling 40-hour limit calculation chronologically
+                    let calculatedRecords = this.applyWeeklyOTCalculation(rawRecords);
+
+                    // 4. Trim the invisible preceding days and sort descending for display
+                    this.adminRecords = calculatedRecords.filter(r => r.dateStr >= startStr);
                     this.adminRecords.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
                     
                     this.currentPage = 1;
@@ -1015,6 +1029,9 @@
 
                     // Update local arrays immediately so the UI reflects it
                     rec.timeIn = tIn; rec.timeOut = tOut; rec.breakIn = bIn; rec.breakOut = bOut; rec.costCode = cCode; rec.workHours = workHours;
+                    
+                    // Re-calculate the Reg vs OT just in case we changed hours and are viewing All Records
+                    this.adminRecords = this.applyWeeklyOTCalculation(this.adminRecords);
                     this.renderAllRecordsTable();
 
                     this.closeModal('modal-form');
@@ -1034,6 +1051,40 @@
             },
 
             // --- UTILS & HELPERS ---
+            applyWeeklyOTCalculation(records) {
+                // Sort ascending chronologically to simulate the week flowing forward
+                const sorted = [...records].sort((a,b) => {
+                    if (a.dateStr !== b.dateStr) return a.dateStr > b.dateStr ? 1 : -1;
+                    return (a.timeIn || '') > (b.timeIn || '') ? 1 : -1;
+                });
+
+                const weeklyTotals = {};
+                const getMondayKey = (dateStr) => {
+                    const d = new Date(dateStr + "T00:00:00");
+                    const day = d.getDay() || 7;
+                    d.setDate(d.getDate() - day + 1);
+                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                };
+
+                sorted.forEach(r => {
+                    if (r.status === 'DENIED') {
+                        r.regHrs = 0; r.otHrs = 0; return;
+                    }
+                    const weekKey = `${r.empUsername}_${getMondayKey(r.dateStr)}`;
+                    if (!weeklyTotals[weekKey]) weeklyTotals[weekKey] = 0;
+                    
+                    const currentTotal = weeklyTotals[weekKey];
+                    const availableReg = Math.max(0, 40 - currentTotal);
+                    
+                    r.regHrs = Math.min(r.workHours || 0, availableReg);
+                    r.otHrs = Math.max(0, (r.workHours || 0) - r.regHrs);
+                    
+                    weeklyTotals[weekKey] += (r.workHours || 0);
+                });
+
+                return sorted;
+            },
+
             formatDate(date) {
                 // Force formatting into Guam Time zone to prevent day shifts due to PH laptop time
                 const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Pacific/Guam', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -1355,7 +1406,12 @@
                 }
 
                 completePending.forEach(r => {
-                    const details = r.timeIn === 'LEAVE' ? `[LEAVE] ${r.notes}` : `Shift: ${r.timeIn} - ${r.timeOut} (${r.workHours.toFixed(2)} hrs)`;
+                    let otBadge = '';
+                    if (r.workHours > 8 && r.timeIn !== 'LEAVE') {
+                        otBadge = `<br><span class="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase mt-1 inline-block">⚠️ Daily OT (>8h) Approval</span>`;
+                    }
+                    
+                    const details = r.timeIn === 'LEAVE' ? `[LEAVE] ${r.notes}` : `Shift: ${r.timeIn} - ${r.timeOut} (${r.workHours.toFixed(2)} hrs) ${otBadge}`;
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-50 transition";
                     tr.innerHTML = `
@@ -1384,7 +1440,7 @@
                 document.getElementById('pagination-info').innerText = `Page ${this.currentPage} of ${totalPages} (Total ${records.length} entries loaded)`;
 
                 if(paginatedRecords.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500">No records found. Adjust the date filter and click 'Filter'.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-12 text-center text-slate-500">No records found. Adjust the date filter and click 'Filter'.</td></tr>`;
                     return;
                 }
 
@@ -1401,7 +1457,8 @@
                         <td class="px-4 py-3 text-slate-600">${r.costCode}</td>
                         <td class="px-4 py-3">${r.timeIn || '-'}</td>
                         <td class="px-4 py-3">${r.timeOut || '-'}</td>
-                        <td class="px-4 py-3 font-semibold text-slate-800">${(r.workHours || 0).toFixed(2)}</td>
+                        <td class="px-4 py-3 font-semibold text-emerald-800">${(r.regHrs || 0).toFixed(2)}</td>
+                        <td class="px-4 py-3 font-bold text-purple-700">${(r.otHrs || 0).toFixed(2)}</td>
                         <td class="px-4 py-3 text-xs text-slate-500 truncate max-w-[150px]" title="${r.notes}">${r.notes || '-'} ${badge}</td>
                         <td class="px-4 py-3 text-right"><button onclick="window.sysShowEditRecordModal('${r.id}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded text-xs font-bold border border-blue-200">EDIT</button></td>
                     `;
@@ -1453,18 +1510,20 @@
             },
             
             exportData() {
-                const records = this.adminRecords; // strictly what has been safely fetched
+                // AdminRecords is processed with Reg/OT. Reverse to export chronologically.
+                const records = [...this.adminRecords].reverse();
                 if (records.length === 0) return this.showAlert("Notice", "No records found. Please apply a Date Filter first to fetch records for export.");
 
                 const timestamp = this.formatDate(new Date());
 
                 // 1. Generate CSV Content (Signature column added at end)
-                let csvContent = "Employee Name,Username,Date,Project Name,Cost Code,Time In,Break In,Break Out,Time Out,Work Hours,Status,Notes,Signature\n";
+                let csvContent = "Employee Name,Username,Date,Project Name,Cost Code,Time In,Break In,Break Out,Time Out,Regular Hours,OT Hours,Total Hours,Status,Notes,Signature\n";
                 records.forEach(r => {
                     const row = [
                         `"${r.empName}"`, `"${r.empUsername}"`, r.dateStr, `"${r.projectName}"`, `"${r.costCode}"`,
                         r.timeIn || '', r.breakIn || '', r.breakOut || '', r.timeOut || '',
-                        (r.workHours || 0).toFixed(2), r.status, `"${r.notes || ''}"`, `""`
+                        (r.regHrs || 0).toFixed(2), (r.otHrs || 0).toFixed(2), (r.workHours || 0).toFixed(2), 
+                        r.status, `"${r.notes || ''}"`, `""`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -1476,16 +1535,21 @@
                     const dParts = r.dateStr.split('-');
                     const iifDate = `${dParts[1]}/${dParts[2]}/${dParts[0]}`;
                     
-                    const row = [
-                        "TIMEREC",
-                        iifDate,
-                        `"${r.projectName}"`,
-                        `"${r.empName}"`,
-                        `"${r.costCode}"`,
-                        (r.workHours || 0).toFixed(2),
-                        `"${r.notes || ''}"`
-                    ];
-                    iifContent += row.join('\t') + "\n";
+                    if ((r.regHrs || 0) > 0) {
+                        const rowReg = [
+                            "TIMEREC", iifDate, `"${r.projectName}"`, `"${r.empName}"`,
+                            `"${r.costCode}"`, (r.regHrs).toFixed(2), `"${r.notes || ''}"`
+                        ];
+                        iifContent += rowReg.join('\t') + "\n";
+                    }
+
+                    if ((r.otHrs || 0) > 0) {
+                        const rowOt = [
+                            "TIMEREC", iifDate, `"${r.projectName}"`, `"${r.empName}"`,
+                            `"${r.costCode}"`, (r.otHrs).toFixed(2), `"[OVERTIME] ${r.notes || ''}"`
+                        ];
+                        iifContent += rowOt.join('\t') + "\n";
+                    }
                 });
 
                 // Helper to trigger file download
