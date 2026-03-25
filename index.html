@@ -384,7 +384,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Updated Firebase Configuration for CT Guam Timesheet
         const firebaseConfig = {
@@ -414,12 +414,17 @@
         const sys = {
             currentUser: null,
             users: [],
-            records: [],
             projects: [],
+            
+            // Highly optimized data arrays
+            myRecords: [],       // Auto-loads only for the logged-in user
+            pendingRecords: [],  // Auto-loads only for admins (status == PENDING)
+            adminRecords: [],    // Fetched dynamically by Admins (avoids memory crashes)
+
             timeOffset: 0,
             demoOffset: 0, 
             currentPage: 1,
-            itemsPerPage: 20, // entries per page in all records
+            itemsPerPage: 20,
             unsubs: [],
 
             async init() {
@@ -536,6 +541,12 @@
                 if (this.currentUser.isAdmin) {
                     document.getElementById('admin-controls').classList.remove('hidden');
                     document.getElementById('admin-controls').classList.add('flex');
+                    
+                    // Set default filter dates for All Records tab
+                    const today = this.getRealTime();
+                    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                    document.getElementById('filter-start').value = this.formatDate(firstDay);
+                    document.getElementById('filter-end').value = this.formatDate(today);
                 } else {
                     document.getElementById('admin-controls').classList.add('hidden');
                     document.getElementById('admin-controls').classList.remove('flex');
@@ -563,18 +574,32 @@
                 return new Date(Date.now() + this.timeOffset + this.demoOffset);
             },
 
-            // --- REALTIME DATABASE LISTENERS ---
+            // --- REALTIME DATABASE LISTENERS (OPTIMIZED) ---
             setupRealtimeListeners() {
                 this.clearListeners();
                 
-                // Records Listener
-                const qRecords = query(collection(db, "timesheet_records"));
-                const unsubRecords = onSnapshot(qRecords, (snapshot) => {
-                    this.records = [];
-                    snapshot.forEach(doc => this.records.push({ id: doc.id, ...doc.data() }));
-                    this.renderAllDashboards();
+                // 1. Employee Listener: ONLY fetch records matching the current user's username
+                // This drops the fetch size from 360,000 to ~300 records perfectly scaling the app.
+                const qMyRecords = query(collection(db, "timesheet_records"), where("empUsername", "==", this.currentUser.username));
+                const unsubMyRecords = onSnapshot(qMyRecords, (snapshot) => {
+                    this.myRecords = [];
+                    snapshot.forEach(doc => this.myRecords.push({ id: doc.id, ...doc.data() }));
+                    this.renderTimesheet();
+                    this.renderWeeklySummary();
                 });
-                this.unsubs.push(unsubRecords);
+                this.unsubs.push(unsubMyRecords);
+
+                // 2. Admin Listener: ONLY fetch globally pending approvals
+                if (this.currentUser.isAdmin) {
+                    const qPending = query(collection(db, "timesheet_records"), where("status", "==", "PENDING"));
+                    const unsubPending = onSnapshot(qPending, (snapshot) => {
+                        this.pendingRecords = [];
+                        snapshot.forEach(doc => this.pendingRecords.push({ id: doc.id, ...doc.data() }));
+                        this.renderAdminTable();
+                        this.updatePendingBadge();
+                    });
+                    this.unsubs.push(unsubPending);
+                }
 
                 // Users Listener
                 const unsubUsers = onSnapshot(collection(db, "timesheet_users"), (snapshot) => {
@@ -601,22 +626,43 @@
                 this.unsubs = [];
             },
 
-            renderAllDashboards() {
-                if(!this.currentUser) return;
-                this.renderTimesheet();
-                this.renderWeeklySummary();
-                if(this.currentUser.isAdmin) {
-                    this.renderAdminTable();
+            // --- FETCH ADMIN RECORDS (ON DEMAND ONLY) ---
+            async fetchAdminRecords(startStr, endStr) {
+                if (!startStr || !endStr) {
+                    return this.showAlert("Filter Required", "Please select both a From and To date to retrieve records.", true);
+                }
+                
+                const filterBtn = document.getElementById('btn-filter-records');
+                filterBtn.innerText = "Loading...";
+                filterBtn.disabled = true;
+
+                try {
+                    // Safe Range Query: No composite indexes required by Firebase for this!
+                    const qRef = query(collection(db, "timesheet_records"), where("dateStr", ">=", startStr), where("dateStr", "<=", endStr));
+                    const snapshot = await getDocs(qRef);
+                    
+                    this.adminRecords = [];
+                    snapshot.forEach(doc => this.adminRecords.push({ id: doc.id, ...doc.data() }));
+                    
+                    // Sort descending locally to avoid index requirements
+                    this.adminRecords.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
+                    
+                    this.currentPage = 1;
                     this.renderAllRecordsTable();
-                    this.updatePendingBadge();
+                } catch(e) {
+                    console.error("Fetch Error:", e);
+                    this.showAlert("Database Error", "Failed to retrieve the filtered records from the cloud.", true);
+                } finally {
+                    filterBtn.innerText = "Filter";
+                    filterBtn.disabled = false;
                 }
             },
 
             // --- CORE LOGGING ---
             getActiveRecord() {
                 const todayStr = this.formatDate(this.getRealTime());
-                // An active record is one for today that has a timeIn, but hasn't been timed out yet, and is not a LEAVE record
-                return this.records.find(r => r.empUsername === this.currentUser.username && r.dateStr === todayStr && !r.timeOut && r.timeIn !== 'LEAVE');
+                // Look strictly into the user's localized records
+                return this.myRecords.find(r => r.dateStr === todayStr && !r.timeOut && r.timeIn !== 'LEAVE');
             },
 
             async logAction(type) {
@@ -853,10 +899,11 @@
                                 name: newName, username: newUsername, password: newPass, isAdmin: newRole === 'admin', assignedProjects: assigned
                             });
 
-                            // 3. Update all associated timesheet records to maintain history
-                            const userRecords = this.records.filter(r => r.empUsername === username);
-                            for (const rec of userRecords) {
-                                await updateDoc(doc(db, "timesheet_records", rec.id), { empUsername: newUsername, empName: newName });
+                            // 3. Update all associated timesheet records securely using targeted read
+                            const userRecordsQuery = query(collection(db, "timesheet_records"), where("empUsername", "==", username));
+                            const userRecordsSnapshot = await getDocs(userRecordsQuery);
+                            for (const docSnap of userRecordsSnapshot.docs) {
+                                await updateDoc(doc(db, "timesheet_records", docSnap.id), { empUsername: newUsername, empName: newName });
                             }
 
                             // 4. Delete old user document
@@ -876,9 +923,10 @@
 
                             // Update name in records just in case it changed
                             if (newName !== u.name) {
-                                const userRecords = this.records.filter(r => r.empUsername === username);
-                                for (const rec of userRecords) {
-                                    await updateDoc(doc(db, "timesheet_records", rec.id), { empName: newName });
+                                const userRecordsQuery = query(collection(db, "timesheet_records"), where("empUsername", "==", username));
+                                const userRecordsSnapshot = await getDocs(userRecordsQuery);
+                                for (const docSnap of userRecordsSnapshot.docs) {
+                                    await updateDoc(doc(db, "timesheet_records", docSnap.id), { empName: newName });
                                 }
                             }
                         }
@@ -906,7 +954,9 @@
             },
 
             promptApproval(id) {
-                const rec = this.records.find(r => r.id === id);
+                const rec = this.pendingRecords.find(r => r.id === id);
+                if (!rec) return;
+
                 if (rec.timeIn === 'LEAVE') {
                     this.processApproval(id, 'approve', 'N/A');
                 } else {
@@ -936,7 +986,10 @@
             },
 
             async submitAdminEdit(docId) {
-                const rec = this.records.find(r => r.id === docId);
+                // Find in either pending queue or admin fetched records
+                const rec = this.adminRecords.find(r => r.id === docId) || this.pendingRecords.find(r => r.id === docId);
+                if (!rec) return;
+
                 let tIn = document.getElementById('edit-tIn').value || null;
                 let tOut = document.getElementById('edit-tOut').value || null;
                 let bIn = document.getElementById('edit-bIn').value || null;
@@ -959,6 +1012,11 @@
                         costCode: cCode,
                         workHours: workHours
                     });
+
+                    // Update local arrays immediately so the UI reflects it
+                    rec.timeIn = tIn; rec.timeOut = tOut; rec.breakIn = bIn; rec.breakOut = bOut; rec.costCode = cCode; rec.workHours = workHours;
+                    this.renderAllRecordsTable();
+
                     this.closeModal('modal-form');
                     this.showAlert("Success", "Record updated.");
                 } catch(e) { this.showAlert("Database Error", "Failed to save edit.", true); }
@@ -1121,12 +1179,19 @@
                 // Globals for inline
                 document.getElementById('btn-close-alert').onclick = () => this.closeModal('modal-alert');
                 document.getElementById('btn-close-form').onclick = () => this.closeModal('modal-form');
-                document.getElementById('btn-filter-records').onclick = () => { this.currentPage = 1; this.renderAllRecordsTable(); };
+                
+                // Triggers targeted backend fetch
+                document.getElementById('btn-filter-records').onclick = () => { 
+                    const start = document.getElementById('filter-start').value;
+                    const end = document.getElementById('filter-end').value;
+                    this.fetchAdminRecords(start, end);
+                };
+                
                 document.getElementById('btn-export-csv').onclick = () => this.exportData();
                 document.getElementById('btn-reset-data').onclick = () => this.showResetDataModal();
                 document.getElementById('btn-prev-page').onclick = () => { if(this.currentPage > 1) { this.currentPage--; this.renderAllRecordsTable(); } };
                 document.getElementById('btn-next-page').onclick = () => { 
-                    const records = this.getFilteredRecords();
+                    const records = this.adminRecords;
                     const totalPages = Math.ceil(records.length / this.itemsPerPage) || 1;
                     if(this.currentPage < totalPages) { this.currentPage++; this.renderAllRecordsTable(); } 
                 };
@@ -1138,7 +1203,7 @@
                 window.sysShowEditProjectModal = (id) => this.showEditProjectModal(id);
                 window.sysDeleteProject = (id) => this.deleteProject(id);
                 window.sysShowEditRecordModal = (id) => {
-                    const rec = this.records.find(r => r.id === id);
+                    const rec = this.adminRecords.find(r => r.id === id) || this.pendingRecords.find(r => r.id === id);
                     if(!rec) return;
                     this.showGenericModal("Admin: Edit Timesheet Entry", `
                         <p class="text-sm font-medium mb-4 text-slate-600 border-b pb-2">Editing: ${rec.empName} | ${rec.projectName} | ${rec.dateStr}</p>
@@ -1214,7 +1279,8 @@
                 monday.setDate(monday.getDate() - day + 1);
                 monday.setHours(0,0,0,0);
                 
-                const thisWeek = this.records.filter(r => r.empUsername === this.currentUser.username && new Date(r.dateStr) >= monday && (r.status === 'APPROVED' || r.status === 'PENDING'));
+                // Use the optimized localized array
+                const thisWeek = this.myRecords.filter(r => new Date(r.dateStr) >= monday && (r.status === 'APPROVED' || r.status === 'PENDING'));
                 
                 let totalHrs = 0;
                 thisWeek.forEach(r => totalHrs += (r.workHours || 0));
@@ -1230,9 +1296,9 @@
             renderTimesheet() {
                 const tbody = document.getElementById('timesheet-body');
                 tbody.innerHTML = '';
-                // Sort by date desc, then time In
-                const userRecords = this.records.filter(r => r.empUsername === this.currentUser.username)
-                    .sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
+                
+                // Using strictly the logged-in user's personalized memory store
+                const userRecords = [...this.myRecords].sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
                 
                 if(userRecords.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No records found.</td></tr>`;
@@ -1269,23 +1335,26 @@
 
             updatePendingBadge() {
                 if(!this.currentUser || !this.currentUser.isAdmin) return;
-                const pending = this.records.filter(r => r.status === 'PENDING' && (r.timeOut || r.timeIn === 'LEAVE'));
                 const badge = document.getElementById('pending-badge');
-                if(pending.length > 0) { badge.innerText = pending.length; badge.classList.remove('hidden'); } 
+                // The pendingRecords array is strictly filtered via cloud query now!
+                const completePending = this.pendingRecords.filter(r => r.timeOut || r.timeIn === 'LEAVE');
+                
+                if(completePending.length > 0) { badge.innerText = completePending.length; badge.classList.remove('hidden'); } 
                 else { badge.classList.add('hidden'); }
             },
 
             renderAdminTable() {
                 const tbody = document.getElementById('admin-body');
                 tbody.innerHTML = '';
-                const pending = this.records.filter(r => r.status === 'PENDING' && (r.timeOut || r.timeIn === 'LEAVE'));
                 
-                if(pending.length === 0) {
+                const completePending = this.pendingRecords.filter(r => r.timeOut || r.timeIn === 'LEAVE');
+                
+                if(completePending.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No pending requests in queue.</td></tr>`;
                     return;
                 }
 
-                pending.forEach(r => {
+                completePending.forEach(r => {
                     const details = r.timeIn === 'LEAVE' ? `[LEAVE] ${r.notes}` : `Shift: ${r.timeIn} - ${r.timeOut} (${r.workHours.toFixed(2)} hrs)`;
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-50 transition";
@@ -1302,28 +1371,20 @@
                 });
             },
 
-            getFilteredRecords() {
-                let filtered = [...this.records];
-                const start = document.getElementById('filter-start').value;
-                const end = document.getElementById('filter-end').value;
-                if (start) filtered = filtered.filter(r => new Date(r.dateStr) >= new Date(start));
-                if (end) filtered = filtered.filter(r => new Date(r.dateStr) <= new Date(end));
-                return filtered.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
-            },
-
             renderAllRecordsTable() {
                 const tbody = document.getElementById('all-records-body');
                 tbody.innerHTML = '';
-                const records = this.getFilteredRecords();
+                
+                const records = this.adminRecords; // Uses dynamically fetched array
                 
                 const totalPages = Math.ceil(records.length / this.itemsPerPage) || 1;
                 const startIdx = (this.currentPage - 1) * this.itemsPerPage;
                 const paginatedRecords = records.slice(startIdx, startIdx + this.itemsPerPage);
 
-                document.getElementById('pagination-info').innerText = `Page ${this.currentPage} of ${totalPages} (Total ${records.length} entries)`;
+                document.getElementById('pagination-info').innerText = `Page ${this.currentPage} of ${totalPages} (Total ${records.length} entries loaded)`;
 
                 if(paginatedRecords.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500">No records found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500">No records found. Adjust the date filter and click 'Filter'.</td></tr>`;
                     return;
                 }
 
@@ -1391,9 +1452,9 @@
                 });
             },
             
-            exportData(exportAll = false) {
-                const records = exportAll ? [...this.records].sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr)) : this.getFilteredRecords();
-                if (records.length === 0) return this.showAlert("Notice", "No records found to export.");
+            exportData() {
+                const records = this.adminRecords; // strictly what has been safely fetched
+                if (records.length === 0) return this.showAlert("Notice", "No records found. Please apply a Date Filter first to fetch records for export.");
 
                 const timestamp = this.formatDate(new Date());
 
@@ -1450,79 +1511,67 @@
                     <div class="p-3 bg-rose-50 text-rose-800 rounded-lg border border-rose-200 mb-4 text-sm font-medium">
                         ⚠️ Warning: Deleting records is permanent. It is strongly recommended to download an archive first.
                     </div>
+                    <div class="mb-4 text-sm text-slate-600 bg-slate-100 p-2 rounded">
+                        Note: Download Archive exports the data currently visible in the "All Records" tab.
+                    </div>
                     <div class="mb-4">
                         <button id="btn-modal-archive" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 rounded-lg transition flex justify-center items-center">
-                            Download Archive (All Records)
+                            Download Archive (Current Filter)
                         </button>
                     </div>
                     <hr class="mb-4 border-slate-200">
-                    <div class="mb-3">
-                        <label class="flex items-center space-x-2 text-sm font-bold text-rose-700 cursor-pointer">
-                            <input type="checkbox" id="reset-erase-all" class="w-4 h-4 text-rose-600 rounded">
-                            <span>Erase ALL Data (Clear entire timesheet database)</span>
-                        </label>
-                    </div>
+                    <p class="text-sm font-bold text-rose-700 mb-2">Delete records permanently from cloud:</p>
                     <div id="reset-date-range" class="grid grid-cols-2 gap-4 transition-opacity">
                         <div><label class="block text-sm font-medium mb-1">From Date</label><input type="date" id="reset-start" class="w-full px-3 py-2 border rounded-lg"></div>
                         <div><label class="block text-sm font-medium mb-1">To Date</label><input type="date" id="reset-end" class="w-full px-3 py-2 border rounded-lg"></div>
                     </div>
                 `, () => this.executeDataReset());
 
-                document.getElementById('reset-erase-all').addEventListener('change', (e) => {
-                    const dateRangeDiv = document.getElementById('reset-date-range');
-                    if(e.target.checked) {
-                        dateRangeDiv.classList.add('opacity-40', 'pointer-events-none');
-                    } else {
-                        dateRangeDiv.classList.remove('opacity-40', 'pointer-events-none');
-                    }
-                });
-
                 document.getElementById('btn-modal-archive').onclick = (e) => {
                     e.preventDefault();
-                    this.exportData(true);
+                    this.exportData();
                 };
             },
 
             async executeDataReset() {
-                const eraseAll = document.getElementById('reset-erase-all').checked;
                 const start = document.getElementById('reset-start').value;
                 const end = document.getElementById('reset-end').value;
 
-                let recordsToDelete = [];
+                if (!start || !end) return this.showAlert("Error", "Please select a date range to safely delete records.", true);
 
-                if (eraseAll) {
-                    recordsToDelete = this.records;
-                } else {
-                    if (!start || !end) return this.showAlert("Error", "Please select a date range, or check 'Erase ALL Data'.", true);
-                    recordsToDelete = this.records.filter(r => {
-                        const rDate = new Date(r.dateStr);
-                        return rDate >= new Date(start) && rDate <= new Date(end);
-                    });
-                }
-
-                if (recordsToDelete.length === 0) {
-                    return this.showAlert("Notice", "No records found matching the criteria to delete.");
-                }
-                
                 try {
                     const submitBtn = document.getElementById('modal-form-submit');
                     submitBtn.innerText = "Deleting...";
                     submitBtn.disabled = true;
 
-                    for(const rec of recordsToDelete) {
-                        await deleteDoc(doc(db, "timesheet_records", rec.id));
+                    // Execute cloud query to selectively target the exact records to destroy
+                    const qDel = query(collection(db, "timesheet_records"), where("dateStr", ">=", start), where("dateStr", "<=", end));
+                    const snapshot = await getDocs(qDel);
+                    
+                    if (snapshot.empty) {
+                        this.closeModal('modal-form');
+                        return this.showAlert("Notice", "No records found matching the criteria to delete.");
                     }
 
-                    // Reset button state on success before closing
+                    let deletedCount = 0;
+                    for (const docSnap of snapshot.docs) {
+                        await deleteDoc(doc(db, "timesheet_records", docSnap.id));
+                        deletedCount++;
+                    }
+
                     submitBtn.innerText = "Submit";
                     submitBtn.disabled = false;
 
                     this.closeModal('modal-form');
-                    this.showAlert("Success", `${recordsToDelete.length} records have been permanently deleted.`);
+                    this.showAlert("Success", `${deletedCount} records have been permanently deleted.`);
+                    
+                    // Clear out the view if we just wiped what we were looking at
+                    this.adminRecords = [];
+                    this.renderAllRecordsTable();
                 } catch(e) {
                     this.showAlert("Database Error", "Failed to delete records.", true);
-                    document.getElementById('modal-form-submit').disabled = false;
-                    document.getElementById('modal-form-submit').innerText = "Submit";
+                    const submitBtn = document.getElementById('modal-form-submit');
+                    if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = "Submit"; }
                 }
             }
         };
