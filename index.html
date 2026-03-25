@@ -187,6 +187,7 @@
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-slate-200 bg-amber-50 flex justify-between items-center">
                         <h3 class="font-bold text-amber-800">Pending Approvals Queue</h3>
+                        <span class="text-xs bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold">Only showing your assigned projects</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left whitespace-nowrap">
@@ -210,7 +211,10 @@
             <div id="tab-content-all-records" class="hidden space-y-6 fade-in">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-slate-200 bg-emerald-50 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <h3 class="font-bold text-emerald-800">Company Timesheet Database</h3>
+                        <div>
+                            <h3 class="font-bold text-emerald-800">Company Timesheet Database</h3>
+                            <span class="text-xs text-emerald-700 font-medium">Filtered to your assigned projects</span>
+                        </div>
                         <div class="flex flex-wrap items-center gap-2 text-sm">
                             <div class="flex items-center space-x-2 bg-white px-2 py-1 rounded border border-slate-300">
                                 <label class="text-slate-500 font-medium">From:</label>
@@ -265,7 +269,7 @@
             <div id="tab-content-manage-projects" class="hidden space-y-6 fade-in">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-slate-200 bg-indigo-50 flex justify-between items-center">
-                        <h3 class="font-bold text-indigo-800">Manage Projects</h3>
+                        <h3 class="font-bold text-indigo-800">Manage Assigned Projects</h3>
                         <button id="btn-show-add-project" class="bg-indigo-600 text-white px-4 py-1.5 rounded shadow-sm hover:bg-indigo-700 transition font-medium flex items-center">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add Project
                         </button>
@@ -385,7 +389,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Updated Firebase Configuration for CT Guam Timesheet
         const firebaseConfig = {
@@ -486,20 +490,29 @@
                 const username = document.getElementById('login-username').value.trim().toLowerCase();
                 const pass = document.getElementById('login-password').value;
 
-                // Security: Device Binding Check
-                const registeredUser = localStorage.getItem('timesheet_device_user');
-                if (registeredUser && registeredUser !== username) {
-                    return this.showAlert("Security Alert", `Device Bound: This device is registered exclusively to '${registeredUser}'. You cannot log in with '${username}' on this device.`, true);
-                }
-
                 try {
                     const userDoc = await getDoc(doc(db, "timesheet_users", username));
                     if(userDoc.exists()) {
                         const userData = userDoc.data();
                         if(userData.password === pass) {
-                            // Register device permanently on first successful login
-                            if (!registeredUser) {
-                                localStorage.setItem('timesheet_device_user', username);
+                            
+                            // Security: Device Binding Check
+                            let localDeviceId = localStorage.getItem('timesheet_device_id');
+                            
+                            // If account has a registered device in cloud, check if it matches local browser
+                            if (userData.registeredDeviceId) {
+                                if (!localDeviceId || localDeviceId !== userData.registeredDeviceId) {
+                                    return this.showAlert("Security Alert", `Device Bound: This account is officially registered to another device. Please ask your Admin to reset your device access.`, true);
+                                }
+                            } else {
+                                // Account has no registered device (First login, or admin just reset it)
+                                // Create a new unique device ID for this browser and bind it to the cloud
+                                if (!localDeviceId) {
+                                    localDeviceId = crypto.randomUUID ? crypto.randomUUID() : 'dev_' + Date.now();
+                                    localStorage.setItem('timesheet_device_id', localDeviceId);
+                                }
+                                await updateDoc(doc(db, "timesheet_users", username), { registeredDeviceId: localDeviceId });
+                                userData.registeredDeviceId = localDeviceId; // update local copy
                             }
 
                             localStorage.setItem('timesheet_active_session', JSON.stringify({ username: username }));
@@ -548,12 +561,35 @@
                     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
                     document.getElementById('filter-start').value = this.formatDate(firstDay);
                     document.getElementById('filter-end').value = this.formatDate(today);
+                    
+                    // Trigger Auto-Cleanup of records older than 1 Year silently
+                    this.autoCleanOldData();
                 } else {
                     document.getElementById('admin-controls').classList.add('hidden');
                     document.getElementById('admin-controls').classList.remove('flex');
                 }
                 
                 this.switchTab('personal');
+            },
+
+            async autoCleanOldData() {
+                if(!this.currentUser.isAdmin) return;
+                
+                const oneYearAgo = this.getRealTime();
+                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+                const limitDateStr = this.formatDate(oneYearAgo);
+
+                try {
+                    // Safe cleanup query: limit to 100 to prevent long running operations
+                    const qOld = query(collection(db, "timesheet_records"), where("dateStr", "<", limitDateStr), limit(100));
+                    const snap = await getDocs(qOld);
+                    
+                    snap.forEach(d => {
+                        deleteDoc(doc(db, "timesheet_records", d.id));
+                    });
+                } catch(e) {
+                    console.log("Silent auto-cleanup skipped", e);
+                }
             },
 
             async syncNetworkTime() {
@@ -590,8 +626,9 @@
                 });
                 this.unsubs.push(unsubMyRecords);
 
-                // 2. Admin Listener: ONLY fetch globally pending approvals
+                // Admin specific listeners
                 if (this.currentUser.isAdmin) {
+                    // 2. Admin Listener: Fetch all pending approvals
                     const qPending = query(collection(db, "timesheet_records"), where("status", "==", "PENDING"));
                     const unsubPending = onSnapshot(qPending, (snapshot) => {
                         this.pendingRecords = [];
@@ -600,20 +637,30 @@
                         this.updatePendingBadge();
                     });
                     this.unsubs.push(unsubPending);
+                    
+                    // 3. Admin Listener: Full user directory for management
+                    const unsubUsers = onSnapshot(collection(db, "timesheet_users"), (snapshot) => {
+                        this.users = [];
+                        snapshot.forEach(doc => this.users.push(doc.data()));
+                        
+                        // Keep current admin profile updated live
+                        const updatedSelf = this.users.find(u => u.username === this.currentUser.username);
+                        if (updatedSelf) this.currentUser = updatedSelf;
+                        
+                        this.renderManageUsersTable();
+                    });
+                    this.unsubs.push(unsubUsers);
+                } else {
+                    // Cost Fix: Standard employees ONLY subscribe to their own user document, NOT the whole company!
+                    const unsubSelf = onSnapshot(doc(db, "timesheet_users", this.currentUser.username), (docSnap) => {
+                        if (docSnap.exists()) {
+                            this.currentUser = docSnap.data();
+                        }
+                    });
+                    this.unsubs.push(unsubSelf);
                 }
 
-                // Users Listener
-                const unsubUsers = onSnapshot(collection(db, "timesheet_users"), (snapshot) => {
-                    this.users = [];
-                    snapshot.forEach(doc => this.users.push(doc.data()));
-                    // Update current user to reflect assigned project changes live
-                    const updatedSelf = this.users.find(u => u.username === this.currentUser.username);
-                    if (updatedSelf) this.currentUser = updatedSelf;
-                    if(this.currentUser?.isAdmin) this.renderManageUsersTable();
-                });
-                this.unsubs.push(unsubUsers);
-
-                // Projects Listener
+                // 4. Projects Listener: Used by everyone for dropdowns, etc.
                 const unsubProjects = onSnapshot(collection(db, "timesheet_projects"), (snapshot) => {
                     this.projects = [];
                     snapshot.forEach(doc => this.projects.push({ id: doc.id, ...doc.data() }));
@@ -657,8 +704,14 @@
                     // 3. Apply the rolling 40-hour limit calculation chronologically
                     let calculatedRecords = this.applyWeeklyOTCalculation(rawRecords);
 
-                    // 4. Trim the invisible preceding days and sort descending for display
-                    this.adminRecords = calculatedRecords.filter(r => r.dateStr >= startStr);
+                    // 4. Admin Isolation: Trim preceding days AND strictly filter to Admin's Assigned Projects (plus Leaves)
+                    const assignedList = this.currentUser.assignedProjects || [];
+                    this.adminRecords = calculatedRecords.filter(r => 
+                        r.dateStr >= startStr && 
+                        (assignedList.includes(r.projectId) || r.projectId === 'LEAVE')
+                    );
+                    
+                    // 5. Sort descending for display
                     this.adminRecords.sort((a,b) => new Date(b.dateStr) - new Date(a.dateStr) || (b.timeIn > a.timeIn ? 1 : -1));
                     
                     this.currentPage = 1;
@@ -795,8 +848,13 @@
                 try {
                     const newDocRef = doc(collection(db, "timesheet_projects"));
                     await setDoc(newDocRef, { name: name });
+                    
+                    // Admin Isolation: Auto-assign the creator to their new project so they can see it
+                    const updatedProjects = [...(this.currentUser.assignedProjects || []), newDocRef.id];
+                    await updateDoc(doc(db, "timesheet_users", this.currentUser.username), { assignedProjects: updatedProjects });
+
                     this.closeModal('modal-form');
-                    this.showAlert("Success", `Project ${name} created.`);
+                    this.showAlert("Success", `Project ${name} created and assigned to you.`);
                 } catch(e) { this.showAlert("Database Error", "Failed to add project.", true); }
             },
 
@@ -829,9 +887,12 @@
             // --- ADMIN ACTIONS (Users) ---
             getProjectCheckboxesHTML(assignedProjects = []) {
                 const safeAssigned = assignedProjects || [];
-                if (this.projects.length === 0) return '<p class="text-sm text-slate-500">No projects available. Add projects first.</p>';
+                // Admin Isolation: Admins can only assign users to projects the Admin themselves has access to.
+                const adminProjects = this.projects.filter(p => (this.currentUser.assignedProjects || []).includes(p.id));
+
+                if (adminProjects.length === 0) return '<p class="text-sm text-slate-500">No projects available in your pool.</p>';
                 return `<div class="max-h-40 overflow-y-auto border border-slate-300 rounded-lg p-3 space-y-2 bg-slate-50">
-                    ${this.projects.map(p => {
+                    ${adminProjects.map(p => {
                         const isChecked = safeAssigned.includes(p.id) ? 'checked' : '';
                         return `<label class="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
                             <input type="checkbox" value="${p.id}" class="proj-checkbox w-4 h-4 text-blue-600 rounded" ${isChecked}>
@@ -860,7 +921,8 @@
                     if(userDoc.exists()) return this.showAlert("Error", "User with this username already exists.", true);
 
                     await setDoc(doc(db, "timesheet_users", username), {
-                        name: name, username: username, password: pass, isAdmin: role === 'admin', assignedProjects: assigned
+                        name: name, username: username, password: pass, isAdmin: role === 'admin', assignedProjects: assigned,
+                        registeredDeviceId: null // Explicitly blank so they can bind on next login
                     });
                     this.closeModal('modal-form');
                     this.showAlert("Success", `User ${name} added successfully.`);
@@ -890,7 +952,14 @@
                     const newUsername = document.getElementById('edit-user-username').value.trim().toLowerCase();
                     const newPass = document.getElementById('edit-user-pass').value.trim();
                     const newRole = document.getElementById('edit-user-role').value;
-                    const assigned = this.getSelectedProjects();
+                    
+                    // Admin Isolation: Preserve projects that the admin DOESN'T have access to manage
+                    const currentAssigned = u.assignedProjects || [];
+                    const adminProjects = this.projects.filter(p => (this.currentUser.assignedProjects || []).includes(p.id)).map(p => p.id);
+                    const untouchableProjects = currentAssigned.filter(pid => !adminProjects.includes(pid));
+                    
+                    const newlySelected = this.getSelectedProjects();
+                    const finalAssigned = [...new Set([...untouchableProjects, ...newlySelected])];
 
                     if(!newName || !newUsername || !newPass) return this.showAlert("Error", "Name, username, and password cannot be empty.", true);
 
@@ -908,9 +977,10 @@
                                 return this.showAlert("Error", "This new username is already taken by another user.", true);
                             }
 
-                            // 2. Create new user document
+                            // 2. Create new user document (preserving their registered device)
                             await setDoc(doc(db, "timesheet_users", newUsername), {
-                                name: newName, username: newUsername, password: newPass, isAdmin: newRole === 'admin', assignedProjects: assigned
+                                name: newName, username: newUsername, password: newPass, isAdmin: newRole === 'admin', 
+                                assignedProjects: finalAssigned, registeredDeviceId: u.registeredDeviceId || null
                             });
 
                             // 3. Update all associated timesheet records securely using targeted read
@@ -932,7 +1002,7 @@
                         } else {
                             // Standard Update
                             await updateDoc(doc(db, "timesheet_users", username), {
-                                name: newName, password: newPass, isAdmin: newRole === 'admin', assignedProjects: assigned
+                                name: newName, password: newPass, isAdmin: newRole === 'admin', assignedProjects: finalAssigned
                             });
 
                             // Update name in records just in case it changed
@@ -953,6 +1023,16 @@
                         const submitBtn = document.getElementById('modal-form-submit');
                         if(submitBtn) { submitBtn.innerText = "Submit"; submitBtn.disabled = false; }
                     }
+                });
+            },
+
+            async resetDevice(username) {
+                this.showGenericModal("Reset Device Access", `<p class="text-slate-600">Are you sure you want to unlock <strong>${username}</strong>? This will allow them to securely log in on a new computer or phone.</p>`, async () => {
+                    try {
+                        await updateDoc(doc(db, "timesheet_users", username), { registeredDeviceId: null });
+                        this.closeModal('modal-form');
+                        this.showAlert("Success", `Device access for ${username} has been cleared. They can now bind a new device.`);
+                    } catch(e) { this.showAlert("Database Error", "Failed to clear device registration.", true); }
                 });
             },
 
@@ -1178,7 +1258,14 @@
                     this.showGenericModal("File Leave Request", `
                         <div><label class="block text-sm font-medium mb-1">Leave Date</label><input type="date" id="leave-date" class="w-full px-3 py-2 border rounded-lg"></div>
                         <div class="mt-3"><label class="block text-sm font-medium mb-1">Leave Type</label>
-                        <select id="leave-type" class="w-full px-3 py-2 border rounded-lg"><option>Vacation</option><option>Sick</option><option>Emergency</option></select></div>
+                        <select id="leave-type" class="w-full px-3 py-2 border rounded-lg">
+                            <option>Vacation Leave</option>
+                            <option>Sick Leave</option>
+                            <option>Bereavement Leave</option>
+                            <option>Maternity Leave</option>
+                            <option>Paternity Leave</option>
+                            <option>Annual Leave</option>
+                        </select></div>
                         <div class="mt-3"><label class="block text-sm font-medium mb-1">Reason</label><textarea id="leave-reason" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea></div>
                     `, () => this.submitLeave());
                 };
@@ -1250,6 +1337,7 @@
                 window.sysPromptApproval = (id) => this.promptApproval(id);
                 window.sysProcessApproval = (id, action) => this.processApproval(id, action);
                 window.sysShowEditUserModal = (username) => this.showEditUserModal(username);
+                window.sysResetDevice = (username) => this.resetDevice(username);
                 window.sysDeleteUser = (username) => this.deleteUser(username);
                 window.sysShowEditProjectModal = (id) => this.showEditProjectModal(id);
                 window.sysDeleteProject = (id) => this.deleteProject(id);
@@ -1357,15 +1445,35 @@
                 }
 
                 userRecords.forEach(r => {
-                    let badge = '';
+                    let badgeText = '';
+                    let badgeClass = '';
+                    
                     if (r.timeIn === 'LEAVE') {
-                        badge = r.status === 'PENDING' ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">Pending</span>' :
-                                r.status === 'DENIED' ? '<span class="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">Denied</span>' :
-                                '<span class="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">Approved</span>';
+                        if (r.status === 'PENDING') { badgeText = 'Pending Approval'; badgeClass = 'bg-amber-100 text-amber-800'; }
+                        else if (r.status === 'DENIED') { badgeText = 'Denied'; badgeClass = 'bg-rose-100 text-rose-800'; }
+                        else { badgeText = 'Approved'; badgeClass = 'bg-emerald-100 text-emerald-800'; }
+                    } else if (r.status === 'PENDING') {
+                        if (r.workHours > 8) {
+                            badgeText = 'Pending OT Approval';
+                            badgeClass = 'bg-orange-100 text-orange-800';
+                        } else {
+                            badgeText = 'Pending Admin Approval';
+                            badgeClass = 'bg-amber-100 text-amber-800';
+                        }
+                    } else if (r.status === 'APPROVED') {
+                        badgeText = 'Approved';
+                        badgeClass = 'bg-emerald-100 text-emerald-800';
                     } else if (r.status === 'DENIED') {
-                        badge = '<span class="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">Denied</span>';
+                        badgeText = 'Denied';
+                        badgeClass = 'bg-rose-100 text-rose-800';
                     }
 
+                    if (r.costCode === 'Pending Admin' && r.status !== 'DENIED') {
+                        badgeText += ' (Needs Cost Code)';
+                        badgeClass = 'bg-amber-100 text-amber-800'; // Override to amber if cost code is still needed
+                    }
+
+                    const badge = `<span class="${badgeClass} text-[10px] px-1.5 py-0.5 rounded font-bold uppercase inline-block mt-1">${badgeText}</span>`;
                     const isRunning = !r.timeOut && r.timeIn !== 'LEAVE' ? '<span class="ml-2 inline-flex relative h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>' : '';
 
                     const tr = document.createElement('tr');
@@ -1378,7 +1486,7 @@
                         <td class="px-4 py-3 text-orange-600 font-medium">${r.breakIn || '-'} / ${r.breakOut || '-'}</td>
                         <td class="px-4 py-3">${r.timeOut || '-'}</td>
                         <td class="px-4 py-3 font-bold">${(r.workHours || 0).toFixed(2)}</td>
-                        <td class="px-4 py-3 text-xs text-slate-600 truncate max-w-[200px]" title="${r.notes}">${r.notes || ''} ${badge}</td>
+                        <td class="px-4 py-3 text-xs text-slate-600 truncate max-w-[200px]" title="${r.notes}">${r.notes || ''} <br>${badge}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1387,8 +1495,14 @@
             updatePendingBadge() {
                 if(!this.currentUser || !this.currentUser.isAdmin) return;
                 const badge = document.getElementById('pending-badge');
-                // The pendingRecords array is strictly filtered via cloud query now!
-                const completePending = this.pendingRecords.filter(r => r.timeOut || r.timeIn === 'LEAVE');
+                
+                // Admin Isolation: The pendingRecords array is already strictly filtered via cloud query, 
+                // but we also must ensure it only counts projects the Admin manages (or Leaves)
+                const assignedList = this.currentUser.assignedProjects || [];
+                const completePending = this.pendingRecords.filter(r => 
+                    (r.timeOut || r.timeIn === 'LEAVE') && 
+                    (assignedList.includes(r.projectId) || r.projectId === 'LEAVE')
+                );
                 
                 if(completePending.length > 0) { badge.innerText = completePending.length; badge.classList.remove('hidden'); } 
                 else { badge.classList.add('hidden'); }
@@ -1398,7 +1512,12 @@
                 const tbody = document.getElementById('admin-body');
                 tbody.innerHTML = '';
                 
-                const completePending = this.pendingRecords.filter(r => r.timeOut || r.timeIn === 'LEAVE');
+                // Admin Isolation
+                const assignedList = this.currentUser.assignedProjects || [];
+                const completePending = this.pendingRecords.filter(r => 
+                    (r.timeOut || r.timeIn === 'LEAVE') && 
+                    (assignedList.includes(r.projectId) || r.projectId === 'LEAVE')
+                );
                 
                 if(completePending.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No pending requests in queue.</td></tr>`;
@@ -1469,7 +1588,12 @@
             renderProjectsTable() {
                 const tbody = document.getElementById('manage-projects-body');
                 tbody.innerHTML = '';
-                this.projects.forEach(p => {
+                
+                // Admin Isolation: only show projects they have assigned to them
+                const assignedList = this.currentUser.assignedProjects || [];
+                const adminProjects = this.projects.filter(p => assignedList.includes(p.id));
+
+                adminProjects.forEach(p => {
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-50 transition";
                     tr.innerHTML = `
@@ -1501,6 +1625,7 @@
                         <td class="px-6 py-4">${roleBadge}</td>
                         <td class="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate" title="${assignedNames}">${assignedNames || 'None'}</td>
                         <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="window.sysResetDevice('${u.username}')" class="px-2 py-1 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded font-medium transition text-xs shadow-sm border border-amber-200" title="Reset device lock">Reset Device</button>
                             <button onclick="window.sysShowEditUserModal('${u.username}')" class="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-medium transition text-xs shadow-sm border border-blue-200">Edit</button>
                             <button onclick="window.sysDeleteUser('${u.username}')" class="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded font-medium transition text-xs shadow-sm border border-red-200">Delete</button>
                         </td>
