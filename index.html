@@ -1027,16 +1027,7 @@
                     const docId = `${emp.id}_${todayStr}`;
                     const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1 };
 
-                    let ccOpts = '';
                     const usedCc = log.cost_code_used || emp.cost_code_1 || '';
-                    const options = new Set();
-                    if (usedCc) options.add(usedCc);
-                    if (emp.cost_code_1) options.add(emp.cost_code_1);
-                    if (emp.cost_code_2) options.add(emp.cost_code_2);
-                    
-                    options.forEach(opt => {
-                        ccOpts += `<option value="${opt}" ${usedCc === opt ? 'selected' : ''}>${opt}</option>`;
-                    });
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
@@ -1046,7 +1037,7 @@
                             <td class="px-4 py-2"><input type="time" class="edit-out border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_out}" disabled></td>
                             <td class="px-4 py-2"><input type="time" class="edit-in2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_in}" disabled></td>
                             <td class="px-4 py-2"><input type="time" class="edit-out2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_out}" disabled></td>
-                            <td class="px-4 py-2"><select class="edit-cc border rounded px-1 py-0.5 text-xs w-full max-w-[120px] bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>${ccOpts}</select></td>
+                            <td class="px-4 py-2"><input type="text" class="edit-cc border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent" value="${usedCc}" disabled></td>
                             <td class="px-4 py-2">
                                 <button onclick="app.toggleEditRow('${emp.id}', '${docId}')" class="btn-toggle-edit bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded text-xs font-bold border border-slate-300">EDIT</button>
                                 <button onclick="app.saveSingleLog('${emp.id}', '${docId}')" class="btn-save-edit hidden bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">SAVE</button>
@@ -1078,7 +1069,16 @@
                 const am_out = row.querySelector('.edit-out').value;
                 const pm_in = row.querySelector('.edit-in2').value;
                 const pm_out = row.querySelector('.edit-out2').value;
-                const cc = row.querySelector('.edit-cc').value;
+                const cc = row.querySelector('.edit-cc').value.trim();
+                const emp = this.employees.find(e => e.id === empId);
+                let cc_changed = false;
+                if (emp) {
+                    const cc1 = emp.cost_code_1 || '';
+                    const cc2 = emp.cost_code_2 || '';
+                    if (cc !== cc1 && cc !== cc2) {
+                        cc_changed = true;
+                    }
+                }
 
                 const total = this.calculateHours(am_in, am_out) + this.calculateHours(pm_in, pm_out);
                 
@@ -1091,7 +1091,8 @@
                 try {
                     await setDoc(docPath('timesheets', docId), {
                         project_id: this.activeProjectId, emp_id: empId, date: this.getTodayDateStr(),
-                        am_in, am_out, pm_in, pm_out, cost_code_used: cc, total_hrs: total
+                        am_in, am_out, pm_in, pm_out, cost_code_used: cc, total_hrs: total,
+                        cost_code_changed: cc_changed
                     }, {merge: true});
                     
                     btnSave.innerText = "SAVED!"; btnSave.classList.replace('text-indigo-700','text-green-700');
@@ -1419,11 +1420,12 @@
             generateEmployeePrintRow(emp, num, log, absentIds = []) {
                 const isAbsent = absentIds.includes(emp.id);
                 const sigContent = isAbsent ? '<span style="font-weight:bold; color:red;">ABSENT</span>' : '';
+                const cc = log.cost_code_used !== undefined ? log.cost_code_used : (emp.cost_code_1 || '');
                 return `
                     <tr>
                         <td>${num}</td>
                         <td>${emp.emp_id}</td>
-                        <td>${log.cost_code_used || ''}</td>
+                        <td>${cc}</td>
                         <td style="text-align:left;">${emp.name}</td>
                         <td>${log.am_in||''}</td>
                         <td>${log.am_out||''}</td>
@@ -1500,7 +1502,7 @@
                 if(emps.length === 0) return this.showModal('Notice', 'No employees exist to print for this project.');
 
                 // Helper to get log for an employee
-                const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0, cost_code_used: '' };
+                const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0 };
 
                 // Check for incomplete data
                 let incompleteCount = 0;
@@ -1567,14 +1569,13 @@
                                 pm_in: log.pm_in || '',
                                 pm_out: log.pm_out || '',
                                 total_hrs: log.total_hrs || 0,
-                                cost_code_used: log.cost_code_used || emp.cost_code_1 || '',
+                                cost_code_used: log.cost_code_used !== undefined ? log.cost_code_used : (emp.cost_code_1 || ''),
                                 approved: true
                             }, {merge: true});
                         });
                         await batch.commit();
                         this.hideModal();
                         this.showToast('Timesheets approved and saved.');
-                        this.fetchData(); // Refresh to get approved status
                         
                         // Proceed to print
                         this.executePrint(proj, emps, todayStr, absentIds);
@@ -1595,7 +1596,7 @@
                 const compAddr = this.companySettings.address || 'Company Address Not Set';
                 const compLogo = this.companySettings.logo_url;
 
-                const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0, cost_code_used: '' };
+                const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0 };
 
                 let finalPagesHTML = '';
 
@@ -1683,7 +1684,7 @@
 
                     const row = [
                         log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`,
-                        ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}"`
+                        ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -1737,7 +1738,7 @@
                             <td class="px-4 py-3">${r.am_out || '-'}</td>
                             <td class="px-4 py-3">${r.pm_in || '-'}</td>
                             <td class="px-4 py-3">${r.pm_out || '-'}</td>
-                            <td class="px-4 py-3 font-mono text-xs text-slate-500">${r.cost_code_used || '-'}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">${r.cost_code_used || '-'}${r.cost_code_changed ? ' <span class="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-bold" title="Manually changed by PM">EDITED</span>' : ''}</td>
                             <td class="px-4 py-3 font-semibold text-slate-800">${(r.total_hrs || 0).toFixed(2)}</td>
                         </tr>
                     `;
