@@ -24,22 +24,22 @@
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; font-family: 'Times New Roman', Times, serif; display: block; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; font-family: Arial, Helvetica, sans-serif; display: block; }
             .print-page { page-break-after: always; padding: 15px; width: 100%; box-sizing: border-box; display: block; }
             .print-page:last-child { page-break-after: auto; }
             .print-content { display: block; }
             .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; margin-bottom: 0; }
             .print-table tr { page-break-inside: avoid; }
             .print-table th, .print-table td { border: 1px solid black; padding: 2px; text-align: center; height: 20px; }
-            .print-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-            .print-logo-box { width: 100px; height: 50px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; }
-            .print-company-info { text-align: center; flex-grow: 1; font-size: 12px; }
-            .print-title { text-align: center; font-weight: bold; font-size: 16px; margin: 20px 0; text-decoration: underline; }
-            .print-meta { margin-bottom: 10px; font-size: 12px; }
-            .print-meta-row { display: flex; margin-bottom: 4px; }
-            .print-meta-label { width: 120px; font-weight: bold; }
+            .print-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+            .print-logo-box { width: 80px; height: 40px; border: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .print-company-info { text-align: center; flex-grow: 1; font-size: 11px; line-height: 1.2; }
+            .print-title { text-align: center; font-weight: bold; font-size: 14px; margin: 10px 0; text-decoration: underline; }
+            .print-meta { margin-bottom: 5px; font-size: 11px; }
+            .print-meta-row { display: flex; margin-bottom: 2px; }
+            .print-meta-label { width: 110px; font-weight: bold; }
             .job-category-row { font-weight: bold; text-align: left !important; background-color: #f3f4f6; padding-left: 20px !important; }
-            .footer-notes { font-size: 10px; }
+            .footer-notes { font-size: 10px; margin-top: 8px; }
             @page { size: letter portrait; margin: 10mm; }
         }
     </style>
@@ -1451,7 +1451,7 @@
                                 <strong>${compName}</strong><br>
                                 <div style="white-space: pre-wrap;">${compAddr}</div>
                             </div>
-                            <div style="width:100px;"></div> <!-- Spacer -->
+                            <div style="width:80px;"></div> <!-- Spacer -->
                         </div>
                         
                         <div class="print-meta">
@@ -1485,29 +1485,27 @@
                         </table>
                     </div>
 
-                    <div class="footer-notes" style="border: 1px solid black; border-top: none; font-size: 10px; display: flex; flex-direction: column; page-break-inside: avoid;">
-                        <div style="padding: 2px 4px; border-bottom: 1px solid black; line-height: 1.2;">
-                            <strong>NOTE:</strong><br>
-                            1. Please make sure that all entries in this DTR are complete and final before submitting to Payroll-In-Charge.<br>
-                            2. This should always be submitted to Payroll-In-Charge at the end of the day.
+                    <div class="footer-notes" style="border: 1px solid black; font-size: 10px; display: flex; flex-direction: column; page-break-inside: avoid; margin-top: 10px;">
+                        <div style="padding: 2px 4px; border-bottom: 1px solid black; line-height: 1.1;">
+                            <strong>NOTE:</strong> 1. Please make sure that all entries in this DTR are complete and final before submitting to Payroll-In-Charge. 2. This should always be submitted to Payroll-In-Charge at the end of the day.
                         </div>
-                        <div style="display: flex; height: 60px;">
-                            <div style="flex: 1; border-right: 1px solid black; padding: 4px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
-                                <p style="margin: 0; padding-top: 5px;">I certify and approve that the above time record of Employees (EE) are true and correct.</p>
-                                <div style="margin: 0 auto; width: 70%;">
-                                    <div style="border-bottom: 1px solid black; height: 20px;"></div>
-                                    <div style="padding-top: 2px; line-height: 1;">
-                                        <strong>PROJECT SUPERINTENDENT</strong><br>
-                                        <span style="font-size: 8px;">(PRINTED NAME AND SIGNATURE)</span>
+                        <div style="display: flex; height: 45px;">
+                            <div style="flex: 1; border-right: 1px solid black; padding: 2px 4px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                                <p style="margin: 0; padding-top: 2px; font-size: 9px;">I certify and approve that the above time record of Employees (EE) are true and correct.</p>
+                                <div style="margin: 0 auto; width: 60%;">
+                                    <div style="border-bottom: 1px solid black; height: 15px;"></div>
+                                    <div style="padding-top: 1px; line-height: 1;">
+                                        <strong style="font-size: 9px;">PROJECT SUPERINTENDENT</strong><br>
+                                        <span style="font-size: 7px;">(PRINTED NAME AND SIGNATURE)</span>
                                     </div>
                                 </div>
                             </div>
-                            <div style="flex: 1; padding: 4px; display: flex; flex-direction: column; justify-content: space-between;">
-                                <p style="margin: 0; text-align: left; padding-left: 15%; font-weight: bold; padding-top: 5px;">RECEIVED BY:</p>
-                                <div style="margin: 0 auto; width: 70%; text-align: center;">
-                                    <div style="border-bottom: 1px solid black; height: 20px;"></div>
-                                    <div style="padding-top: 2px; line-height: 1;">
-                                        <strong>ACCOUNTING DEPARTMENT</strong>
+                            <div style="flex: 1; padding: 2px 4px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <p style="margin: 0; text-align: left; padding-left: 10%; font-weight: bold; padding-top: 2px; font-size: 9px;">RECEIVED BY:</p>
+                                <div style="margin: 0 auto; width: 60%; text-align: center;">
+                                    <div style="border-bottom: 1px solid black; height: 15px;"></div>
+                                    <div style="padding-top: 1px; line-height: 1;">
+                                        <strong style="font-size: 9px;">ACCOUNTING DEPARTMENT</strong>
                                     </div>
                                 </div>
                             </div>
