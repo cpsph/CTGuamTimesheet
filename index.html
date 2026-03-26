@@ -350,6 +350,8 @@
                                     <th class="px-6 py-3">Name</th>
                                     <th class="px-6 py-3">Username</th>
                                     <th class="px-6 py-3">Role</th>
+                                    <th class="px-6 py-3">Assigned Projects</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="users-body" class="divide-y divide-slate-200"></tbody>
@@ -523,7 +525,8 @@
 
             async syncNetworkTime() {
                 try {
-                    const res = await fetch('http://worldtimeapi.org/api/timezone/Asia/Manila');
+                    // Changed to Pacific/Guam timezone
+                    const res = await fetch('http://worldtimeapi.org/api/timezone/Pacific/Guam');
                     if(res.ok) {
                         const data = await res.json();
                         const networkTime = new Date(data.datetime).getTime();
@@ -542,7 +545,7 @@
                     const adminRef = docPath('users', 'kate.catapang');
                     const snap = await getDoc(adminRef);
                     if(!snap.exists()) {
-                        await setDoc(adminRef, { username: 'kate.catapang', password: 'admin123', role: 'admin', name: 'Kate Catapang' });
+                        await setDoc(adminRef, { username: 'kate.catapang', password: 'admin123', role: 'admin', name: 'Kate Catapang', assigned_projects: [] });
                     }
                 } catch(e) { console.error("Initial admin check failed.", e); }
             },
@@ -669,7 +672,15 @@
                 const pSel = document.getElementById('pm-select-project');
                 const fSel = document.getElementById('filter-project');
                 const rSel = document.getElementById('admin-roster-project-filter');
-                const opts = `<option value="">-- All / Select Project --</option>` + this.projects.map(p => `<option value="${p.id}">${p.name} (${p.number})</option>`).join('');
+                
+                let allowedProjects = this.projects;
+                if (this.profile && this.profile.role === 'pm') {
+                    const assigned = this.profile.assigned_projects || [];
+                    allowedProjects = this.projects.filter(p => assigned.includes(p.id));
+                }
+
+                const opts = `<option value="">-- ${this.profile?.role === 'admin' ? 'All / Select Project' : 'Select Project'} --</option>` + allowedProjects.map(p => `<option value="${p.id}">${p.name} (${p.number})</option>`).join('');
+                
                 if(pSel && !this.activeProjectId) pSel.innerHTML = opts;
                 if(fSel) fSel.innerHTML = opts;
                 if(rSel && rSel.options.length <= 1) rSel.innerHTML = opts;
@@ -719,7 +730,8 @@
             // --- PM ROSTER BULK ACTIONS ---
             getTodayDateStr() {
                 const d = this.getRealTime();
-                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Guam', year: 'numeric', month: '2-digit', day: '2-digit' });
+                return formatter.format(d);
             },
 
             renderRoster() {
@@ -759,7 +771,7 @@
                 if(checked.length === 0) return this.showModal('Notice', 'No employees selected.');
 
                 const todayStr = this.getTodayDateStr();
-                const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
+                const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
 
                 try {
                     const batch = writeBatch(db);
@@ -781,7 +793,7 @@
                     }
 
                     await batch.commit();
-                    this.showModal('Success', `Bulk ${type.replace('_', ' ')} applied successfully to ${checked.length} employees at ${nowTime}.`);
+                    this.showModal('Success', `Bulk ${type.replace('_', ' ')} applied successfully to ${checked.length} employees at ${nowTime} (Guam Time).`);
                 } catch(e) { console.error(e); this.showModal('Error', 'Failed to save bulk action to database.'); }
             },
 
@@ -1244,16 +1256,6 @@
             },
 
             // --- EXPORT & MISC ---
-            roundTime15m(timeStr) {
-                if(!timeStr) return "";
-                let [h, m] = timeStr.split(':').map(Number);
-                let totalMins = h * 60 + m;
-                let rounded = Math.round(totalMins / 15) * 15;
-                let resH = Math.floor(rounded / 60) % 24;
-                let resM = rounded % 60;
-                return `${resH.toString().padStart(2,'0')}:${resM.toString().padStart(2,'0')}`;
-            },
-
             exportData(isRounded) {
                 const logs = this.getFilteredRecords();
                 if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
@@ -1397,18 +1399,89 @@
                 });
             },
 
+            // --- USER MANAGEMENT (Added PM Project Assignment) ---
             renderUsers() {
                 const tbody = document.getElementById('users-body');
                 if(!tbody) return;
                 tbody.innerHTML = '';
                 this.users.forEach(u => {
+                    let assignedNames = 'All (Admin)';
+                    if (u.role === 'pm') {
+                        if (u.assigned_projects && u.assigned_projects.length > 0) {
+                            assignedNames = u.assigned_projects.map(pid => {
+                                const p = this.projects.find(x => x.id === pid);
+                                return p ? p.name : 'Unknown';
+                            }).join(', ');
+                        } else {
+                            assignedNames = '<span class="text-rose-500 italic">No projects assigned</span>';
+                        }
+                    }
+                    
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-b">
                             <td class="px-6 py-4 font-medium">${u.name}</td>
                             <td class="px-6 py-4">${u.username}</td>
                             <td class="px-6 py-4 uppercase text-xs font-bold ${u.role==='admin'?'text-blue-600':'text-amber-600'}">${u.role}</td>
+                            <td class="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate" title="${assignedNames}">${assignedNames}</td>
+                            <td class="px-6 py-4 text-right space-x-2">
+                                <button onclick="app.editUser('${u.username}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded text-xs font-bold border border-blue-200">EDIT</button>
+                                ${u.username !== 'admin' && u.username !== 'kate.catapang' ? `<button onclick="app.deleteUser('${u.username}')" class="text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1 rounded text-xs font-bold border border-rose-200">DEL</button>` : ''}
+                            </td>
                         </tr>
                     `;
+                });
+            },
+
+            editUser(username) {
+                const u = username ? this.users.find(x => x.username === username) : { username: '', name: '', role: 'pm', assigned_projects: [] };
+                
+                const projCheckboxes = this.projects.map(p => {
+                    const isChecked = (u.assigned_projects || []).includes(p.id) ? 'checked' : '';
+                    return `
+                    <label class="flex items-center space-x-2 text-sm mt-1">
+                        <input type="checkbox" class="user-proj-chk w-4 h-4 text-blue-600 rounded" value="${p.id}" ${isChecked}>
+                        <span class="truncate">${p.name}</span>
+                    </label>
+                    `;
+                }).join('');
+
+                this.showFormModal(username ? 'Edit User' : 'Add System User', `
+                    <input type="text" id="nu-name" placeholder="Full Name" value="${u.name}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
+                    <input type="text" id="nu-username" placeholder="Username" value="${u.username}" class="w-full px-3 py-2 border rounded mb-3 outline-none" ${username ? 'readonly bg-slate-100' : ''}>
+                    <input type="password" id="nu-pass" placeholder="${username ? 'Leave blank to keep current password' : 'Password'}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
+                    <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none mb-3" onchange="document.getElementById('pm-proj-assign').classList.toggle('hidden', this.value !== 'pm')">
+                        <option value="pm" ${u.role === 'pm' ? 'selected' : ''}>Project Manager (PM)</option>
+                        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>System Admin</option>
+                    </select>
+                    <div id="pm-proj-assign" class="border border-slate-200 p-3 rounded bg-slate-50 max-h-40 overflow-y-auto ${u.role === 'pm' ? '' : 'hidden'}">
+                        <span class="block text-xs font-bold text-slate-500 uppercase mb-2">Assign Projects</span>
+                        ${projCheckboxes || '<span class="text-xs text-slate-400">No projects available.</span>'}
+                    </div>
+                `, async () => {
+                    const un = document.getElementById('nu-username').value.trim().toLowerCase();
+                    const name = document.getElementById('nu-name').value.trim();
+                    const pass = document.getElementById('nu-pass').value;
+                    const role = document.getElementById('nu-role').value;
+                    const assigned_projects = role === 'pm' ? Array.from(document.querySelectorAll('.user-proj-chk:checked')).map(c => c.value) : [];
+
+                    if(!un || !name) return this.showModal('Error', 'Username and Name are required.');
+                    if(!username && !pass) return this.showModal('Error', 'Password is required for new users.');
+
+                    try {
+                        const data = { username: un, name, role, assigned_projects };
+                        if (pass) data.password = pass; // Only update password if provided
+                        await setDoc(docPath('users', un), data, { merge: true });
+                        this.hideModal();
+                    } catch(e) { this.showModal('Error','Failed to save user.'); }
+                });
+            },
+
+            deleteUser(username) {
+                this.showFormModal('Confirm Deletion', `Are you sure you want to delete user <strong>${username}</strong>?`, async () => {
+                    try {
+                        await deleteDoc(docPath('users', username));
+                        this.hideModal();
+                    } catch(e) { this.showModal('Error', 'Failed to delete user.'); }
                 });
             },
 
@@ -1435,20 +1508,24 @@
                 } catch(e) { this.showModal('Error', 'Failed to save settings.'); }
             },
 
+            // --- GUAM TIME ENGINE ---
             updateClock() {
                 const now = this.getRealTime();
                 const clockEl = document.getElementById('live-clock');
+                const timeOpts = { timeZone: 'Pacific/Guam' };
+                const dateOpts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Pacific/Guam' };
+                
                 if (clockEl) {
                     if (this.demoOffset !== 0) {
                         clockEl.classList.replace('bg-blue-800', 'bg-amber-600');
-                        clockEl.innerText = "DEMO: " + now.toLocaleTimeString('en-US');
+                        clockEl.innerText = "DEMO: " + now.toLocaleTimeString('en-US', timeOpts);
                     } else {
                         clockEl.classList.replace('bg-amber-600', 'bg-blue-800');
-                        clockEl.innerText = now.toLocaleTimeString('en-US');
+                        clockEl.innerText = now.toLocaleTimeString('en-US', timeOpts);
                     }
                 }
                 const ds = document.getElementById('dash-date-display');
-                if(ds) ds.innerText = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                if(ds) ds.innerText = now.toLocaleDateString('en-US', dateOpts);
             },
 
             showModal(title, msgHtml, showCancel = false, confirmCb = null) {
@@ -1484,26 +1561,14 @@
                 tbs.forEach(t => { const el = document.getElementById(`tab-btn-${t}`); if(el) el.onclick = () => this.switchTab(t); });
 
                 document.getElementById('btn-validate-gps').onclick = () => this.validateGPS();
-                // Bound the new Excel/CSV engine to the input element
                 document.getElementById('excel-file-input').onchange = (e) => this.handleFileUpload(e);
                 document.getElementById('btn-print-dtr').onclick = () => this.generatePrintView();
                 document.getElementById('settings-logo-upload').onchange = (e) => this.handleLogoUpload(e);
                 
                 document.getElementById('btn-add-project').onclick = () => this.editProject(null);
-                document.getElementById('btn-add-user').onclick = () => {
-                    this.showFormModal('Add System User', `
-                        <input type="text" id="nu-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                        <input type="text" id="nu-username" placeholder="Username" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                        <input type="text" id="nu-pass" placeholder="Password" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                        <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none"><option value="pm">Project Manager (PM)</option><option value="admin">System Admin</option></select>
-                    `, async () => {
-                        const username = document.getElementById('nu-username').value.trim().toLowerCase();
-                        if(!username) return;
-                        try {
-                            await setDoc(docPath('users', username), { username, name: document.getElementById('nu-name').value, password: document.getElementById('nu-pass').value, role: document.getElementById('nu-role').value });
-                        } catch(e) { this.showModal('Error','Failed to add user.'); }
-                    });
-                };
+                
+                // Users tab bindings
+                document.getElementById('btn-add-user').onclick = () => this.editUser(null);
 
                 document.getElementById('btn-filter-records').onclick = () => { this.currentPage = 1; this.renderAllRecordsTable(); };
                 document.getElementById('btn-reset-data').onclick = () => this.showResetDataModal();
