@@ -192,13 +192,26 @@
                 <div id="timesheet-locked-view" class="hidden flex-col space-y-6">
                     <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-800">Today's Timesheet Records</h2>
+                            <h2 class="text-lg font-bold text-slate-800">Timesheet Records</h2>
                             <p class="text-sm text-slate-500">Review, adjust specific times, assign cost codes, and print DTR.</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <label class="text-sm font-medium text-slate-700">Select Date:</label>
+                                <input type="date" id="pm-timesheet-date" class="border border-slate-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-500" onchange="app.renderTimesheetEdit()">
+                            </div>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button onclick="app.activeProjectId = null; app.switchTab('pm-timesheet');" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition flex items-center shadow-sm border border-slate-300">
                                 Change Project
                             </button>
+                            <div class="relative group">
+                                <button class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export CSV
+                                </button>
+                                <div class="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
+                                    <button onclick="app.exportPMData(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
+                                    <button onclick="app.exportPMData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
+                                </div>
+                            </div>
                             <button id="btn-print-dtr" class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 Print Daily Time Record
@@ -213,6 +226,7 @@
                                     <tr>
                                         <th class="px-4 py-3">Emp ID</th>
                                         <th class="px-4 py-3">Name</th>
+                                        <th class="px-4 py-3">Leave Type</th>
                                         <th class="px-4 py-3">AM IN</th>
                                         <th class="px-4 py-3">AM OUT</th>
                                         <th class="px-4 py-3">PM IN</th>
@@ -295,8 +309,8 @@
 
             <!-- ADMIN: ALL RECORDS & EXPORT -->
             <div id="tab-content-admin-all-records" class="hidden space-y-6 fade-in">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-200 bg-emerald-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-emerald-50 rounded-t-xl flex flex-col md:flex-row justify-between items-center gap-4">
                         <h3 class="font-bold text-emerald-800">Company Timesheet Database</h3>
                         <div class="flex flex-wrap items-center gap-2 text-sm">
                             <select id="filter-project" class="outline-none text-slate-800 bg-white px-2 py-1 rounded border border-slate-300"></select>
@@ -312,11 +326,15 @@
                             
                             <div class="relative group">
                                 <button class="bg-slate-800 text-white px-4 py-1.5 rounded shadow-sm hover:bg-slate-900 transition flex items-center font-medium">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export CSV
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export
                                 </button>
-                                <div class="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
+                                <div class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
+                                    <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">CSV Format</div>
                                     <button onclick="app.exportData(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
-                                    <button onclick="app.exportData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
+                                    <button onclick="app.exportData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 border-b">Export Rounded (15m)</button>
+                                    <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">IIF Format (QuickBooks)</div>
+                                    <button onclick="app.exportIIF(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
+                                    <button onclick="app.exportIIF(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
                                 </div>
                             </div>
                             
@@ -729,6 +747,9 @@
                 if(btn) btn.className = btn.className.replace('tab-inactive', 'tab-active');
 
                 const projSelector = document.getElementById('pm-project-selector');
+                if (tabId === 'pm-timesheet') {
+                    this.setPMDatePickerLimits();
+                }
                 if (tabId === 'pm-roster' || tabId === 'pm-timesheet') {
                     if (!this.activeProjectId) {
                         projSelector.classList.replace('hidden', 'flex');
@@ -814,6 +835,11 @@
                         btn.innerHTML = origText;
                         btn.disabled = false;
                         const dist = this.haversineDistance(pos.coords.latitude, pos.coords.longitude, parseFloat(proj.lat), parseFloat(proj.lng));
+                        
+                        if (isNaN(dist)) {
+                            return this.showModal('Error', 'Invalid project coordinates configured. Please contact the administrator.');
+                        }
+
                         if(dist <= 3000) { 
                             this.activeProjectId = pid;
                             document.getElementById('modal-container').classList.add('hidden');
@@ -835,6 +861,7 @@
                             this.renderTimesheetEdit();
                             this.showToast('GPS Location Verified.');
                         } else {
+                            this.showToast('Access Denied: Out of range.', 'error');
                             this.showModal('Access Denied', `You are ${Math.round(dist)} meters away from the site. Must be within 3,000 meters.`);
                         }
                     },
@@ -863,6 +890,38 @@
                 const d = this.getRealTime();
                 const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Guam', year: 'numeric', month: '2-digit', day: '2-digit' });
                 return formatter.format(d);
+            },
+
+            getTimesheetDateStr() {
+                const dateInput = document.getElementById('pm-timesheet-date');
+                if (dateInput && dateInput.value) {
+                    return dateInput.value;
+                }
+                return this.getTodayDateStr();
+            },
+
+            setPMDatePickerLimits() {
+                const d = this.getRealTime();
+                // Get Monday of current week
+                const day = d.getDay() || 7; // 1-7 (Mon-Sun)
+                const monday = new Date(d);
+                monday.setDate(d.getDate() - day + 1);
+                
+                const sunday = new Date(monday);
+                sunday.setDate(monday.getDate() + 6);
+
+                const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Guam', year: 'numeric', month: '2-digit', day: '2-digit' });
+                const minDate = formatter.format(monday);
+                const maxDate = formatter.format(sunday);
+
+                const dateInput = document.getElementById('pm-timesheet-date');
+                if (dateInput) {
+                    dateInput.min = minDate;
+                    dateInput.max = maxDate;
+                    if (!dateInput.value) {
+                        dateInput.value = this.getTodayDateStr();
+                    }
+                }
             },
 
             renderRoster() {
@@ -917,12 +976,23 @@
                     if (isChecked) preCheckedCount++;
                     
                     empListHtml += `
-                        <label class="modal-roster-item flex items-center space-x-3 py-2 cursor-pointer hover:bg-slate-100 px-2 rounded transition" data-name="${emp.name}" data-id="${emp.emp_id}">
-                            <input type="checkbox" class="modal-roster-chk w-4 h-4 text-blue-600 rounded" value="${emp.id}" ${isChecked}>
-                            <div class="flex flex-col">
-                                <span class="text-sm font-bold text-slate-800">${emp.name}</span>
-                                <span class="text-xs text-slate-500">${emp.emp_id} | ${emp.job_category || 'N/A'}</span>
+                        <label class="modal-roster-item flex items-center justify-between py-2 hover:bg-slate-100 px-2 rounded transition" data-name="${emp.name}" data-id="${emp.emp_id}">
+                            <div class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="modal-roster-chk w-4 h-4 text-blue-600 rounded" value="${emp.id}" ${isChecked} onchange="this.closest('.modal-roster-item').querySelector('.modal-roster-leave').classList.toggle('hidden', this.checked)">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-slate-800">${emp.name}</span>
+                                    <span class="text-xs text-slate-500">${emp.emp_id} | ${emp.job_category || 'N/A'}</span>
+                                </div>
                             </div>
+                            <select class="modal-roster-leave text-xs border border-slate-300 rounded px-2 py-1 outline-none ${isChecked ? 'hidden' : ''}" data-emp="${emp.id}">
+                                <option value="">-- No Leave (Just Late) --</option>
+                                <option value="Absent">Absent (No Pay)</option>
+                                <option value="Leave">Leave</option>
+                                <option value="Sick">Sick</option>
+                                <option value="Maternity">Maternity</option>
+                                <option value="Paternity">Paternity</option>
+                                <option value="Bereavement">Bereavement</option>
+                            </select>
                         </label>
                     `;
                 });
@@ -992,10 +1062,12 @@
 
             async executeBulkActionBatch(type) {
                 // Read from the confirmation modal, not the background table
-                const checked = Array.from(document.querySelectorAll('.modal-roster-chk:checked')).map(c => c.value);
-                if(checked.length === 0) {
+                const checkedIds = Array.from(document.querySelectorAll('.modal-roster-chk:checked')).map(c => c.value);
+                const allEmpIds = Array.from(document.querySelectorAll('.modal-roster-chk')).map(c => c.value);
+                
+                if(allEmpIds.length === 0) {
                     this.hideModal();
-                    return this.showModal('Notice', 'No employees selected. Action cancelled.');
+                    return this.showModal('Notice', 'No employees found.');
                 }
 
                 const todayStr = this.getTodayDateStr();
@@ -1010,7 +1082,7 @@
                     let appliedCount = 0;
                     let skippedCount = 0;
 
-                    const chunks = this.chunkArray(checked, 400);
+                    const chunks = this.chunkArray(allEmpIds, 400);
 
                     for (const chunk of chunks) {
                         const batch = writeBatch(db);
@@ -1024,17 +1096,34 @@
                             const ref = docPath('timesheets', docId);
                             
                             let data = this.timesheets.find(t => t.id === docId);
-                            if(!data) data = { project_id: this.activeProjectId, emp_id: empId, date: todayStr, am_in: '', am_out: '', pm_in: '', pm_out: '', cost_code_used: emp.cost_code_1, total_hrs: 0 };
-
-                            // Guard clauses to prevent OUT if IN is missing
-                            if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
-                            if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
+                            if(!data) data = { project_id: this.activeProjectId, emp_id: empId, date: todayStr, am_in: '', am_out: '', pm_in: '', pm_out: '', cost_code_used: emp.cost_code_1, total_hrs: 0, leave_type: '' };
 
                             let updated = false;
-                            if(type === 'AM_IN' && !data.am_in) { data.am_in = nowTime; updated = true; }
-                            if(type === 'AM_OUT' && !data.am_out) { data.am_out = nowTime; updated = true; }
-                            if(type === 'PM_IN' && !data.pm_in) { data.pm_in = nowTime; updated = true; }
-                            if(type === 'PM_OUT' && !data.pm_out) { data.pm_out = nowTime; updated = true; }
+
+                            if (checkedIds.includes(empId)) {
+                                // Guard clauses to prevent OUT if IN is missing
+                                if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
+                                if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
+
+                                if(type === 'AM_IN' && !data.am_in) { data.am_in = nowTime; updated = true; }
+                                if(type === 'AM_OUT' && !data.am_out) { data.am_out = nowTime; updated = true; }
+                                if(type === 'PM_IN' && !data.pm_in) { data.pm_in = nowTime; updated = true; }
+                                if(type === 'PM_OUT' && !data.pm_out) { data.pm_out = nowTime; updated = true; }
+                                
+                                if (updated && data.leave_type) {
+                                    data.leave_type = ''; // clear leave if they clocked in
+                                }
+                            } else if (type === 'AM_IN') {
+                                // Unchecked during AM_IN -> Mark as absent/leave
+                                const leaveSelect = document.querySelector(`.modal-roster-leave[data-emp="${empId}"]`);
+                                if (leaveSelect) {
+                                    const leaveType = leaveSelect.value;
+                                    if (data.leave_type !== leaveType) {
+                                        data.leave_type = leaveType;
+                                        updated = true;
+                                    }
+                                }
+                            }
 
                             if (updated) {
                                 data.total_hrs = this.calculateHours(data.am_in, data.am_out) + this.calculateHours(data.pm_in, data.pm_out);
@@ -1052,12 +1141,12 @@
                     if (appliedCount === 0) {
                         this.hideModal();
                         let reason = "No actions were applied. Employees may already have this time logged.";
-                        if (skippedCount > 0) reason = `Cannot perform ${type.replace('_', ' ')}. The selected employees do not have a corresponding IN time logged yet.`;
+                        if (skippedCount > 0) reason = `Cannot perform ${type.replace('_', ' ')}. Some selected employees do not have a corresponding IN time logged yet.`;
                         return this.showModal('Notice', reason);
                     }
 
                     this.hideModal();
-                    let msg = `Bulk ${type.replace('_', ' ')} applied successfully to ${appliedCount} employees at ${nowTime} (Guam Time).`;
+                    let msg = `Bulk action applied successfully to ${appliedCount} employees at ${nowTime} (Guam Time).`;
                     if (skippedCount > 0) msg += `<br><br><span class="text-amber-600 font-bold">Note: ${skippedCount} employee(s) were skipped because they lacked a required IN time.</span>`;
                     this.showModal('Success', msg);
                 } catch(e) { 
@@ -1071,20 +1160,20 @@
             // --- PM REVIEW & EDIT TIMESHEET ---
             renderTimesheetEdit() {
                 if(!this.activeProjectId) return;
-                const todayStr = this.getTodayDateStr();
+                const targetDateStr = this.getTimesheetDateStr();
                 const tbody = document.getElementById('timesheet-edit-body');
                 tbody.innerHTML = '';
 
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
                 
                 if(emps.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
                     return;
                 }
 
                 emps.forEach(emp => {
-                    const docId = `${emp.id}_${todayStr}`;
-                    const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1 };
+                    const docId = `${emp.id}_${targetDateStr}`;
+                    const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1, leave_type: '' };
 
                     const usedCc = log.cost_code_used || emp.cost_code_1 || '';
 
@@ -1092,6 +1181,17 @@
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
                             <td class="px-4 py-2 font-medium">${emp.emp_id}</td>
                             <td class="px-4 py-2 text-sm">${emp.name}</td>
+                            <td class="px-4 py-2">
+                                <select class="edit-leave border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>
+                                    <option value="" ${!log.leave_type ? 'selected' : ''}>Present</option>
+                                    <option value="Absent" ${log.leave_type === 'Absent' ? 'selected' : ''}>Absent</option>
+                                    <option value="Leave" ${log.leave_type === 'Leave' ? 'selected' : ''}>Leave</option>
+                                    <option value="Sick" ${log.leave_type === 'Sick' ? 'selected' : ''}>Sick</option>
+                                    <option value="Maternity" ${log.leave_type === 'Maternity' ? 'selected' : ''}>Maternity</option>
+                                    <option value="Paternity" ${log.leave_type === 'Paternity' ? 'selected' : ''}>Paternity</option>
+                                    <option value="Bereavement" ${log.leave_type === 'Bereavement' ? 'selected' : ''}>Bereavement</option>
+                                </select>
+                            </td>
                             <td class="px-4 py-2"><input type="time" class="edit-in border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_in}" disabled></td>
                             <td class="px-4 py-2"><input type="time" class="edit-out border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_out}" disabled></td>
                             <td class="px-4 py-2"><input type="time" class="edit-in2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_in}" disabled></td>
@@ -1124,6 +1224,7 @@
 
             async saveSingleLog(empId, docId) {
                 const row = document.getElementById(`row-${docId}`);
+                const leave_type = row.querySelector('.edit-leave').value;
                 const am_in = row.querySelector('.edit-in').value;
                 const am_out = row.querySelector('.edit-out').value;
                 const pm_in = row.querySelector('.edit-in2').value;
@@ -1149,9 +1250,9 @@
                 
                 try {
                     await setDoc(docPath('timesheets', docId), {
-                        project_id: this.activeProjectId, emp_id: empId, date: this.getTodayDateStr(),
+                        project_id: this.activeProjectId, emp_id: empId, date: this.getTimesheetDateStr(),
                         am_in, am_out, pm_in, pm_out, cost_code_used: cc, total_hrs: total,
-                        cost_code_changed: cc_changed
+                        cost_code_changed: cc_changed, leave_type
                     }, {merge: true});
                     
                     btnSave.innerText = "SAVED!"; btnSave.classList.replace('text-indigo-700','text-green-700');
@@ -1506,9 +1607,10 @@
                         let hasWrites = false;
 
                         for(let i=0; i<chunk.length; i++) {
+                            if (!Array.isArray(chunk[i])) continue;
                             // Ensure all columns are cast to strings and trimmed
                             const cols = chunk[i].map(c => String(c || '').trim());
-                            if(cols.length < 6) continue;
+                            if(cols.length < 3) continue; // Minimum required: Project, ID, Name
                             
                             // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC
                             const [pName, eId, eName, jobCat, typeRaw, cc1, cc2] = cols;
@@ -1547,6 +1649,7 @@
                             }
 
                             const safeEmpId = eId.replace(/\W/g, ''); 
+                            if (!safeEmpId) continue;
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
                                 project_id: projId, emp_id: eId, name: eName, 
@@ -1675,7 +1778,7 @@
             generatePrintView() {
                 if(!this.activeProjectId) return;
                 const proj = this.projects.find(p => p.id === this.activeProjectId);
-                const todayStr = this.getTodayDateStr();
+                const todayStr = this.getTimesheetDateStr();
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees exist to print for this project.');
@@ -1842,11 +1945,49 @@
             },
 
             // --- EXPORT & MISC ---
+            exportPMData(isRounded) {
+                if(!this.activeProjectId) return this.showModal('Notice', 'Please select a project first.');
+                
+                const targetDateStr = this.getTimesheetDateStr();
+                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                
+                if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
+
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Total Hours,Cost Code Used\n";
+                const proj = this.projects.find(p => p.id === this.activeProjectId) || {};
+
+                emps.forEach(emp => {
+                    const docId = `${emp.id}_${targetDateStr}`;
+                    const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1, leave_type: '' };
+                    
+                    let ai = log.am_in||'', ao = log.am_out||'', pi = log.pm_in||'', po = log.pm_out||'';
+                    let total = log.total_hrs || 0;
+
+                    if(isRounded) {
+                        ai = this.roundTime15m(ai); ao = this.roundTime15m(ao);
+                        pi = this.roundTime15m(pi); po = this.roundTime15m(po);
+                        total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+                    }
+
+                    const row = [
+                        targetDateStr, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${log.leave_type||''}"`,
+                        ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}${log.cost_code_changed ? ' (Edited)' : ''}"`
+                    ];
+                    csvContent += row.join(',') + "\n";
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `Timesheet_Export_${proj.name}_${isRounded?'Rounded':'Exact'}_${targetDateStr}.csv`;
+                link.click();
+            },
+
             exportData(isRounded) {
                 const logs = this.getFilteredRecords();
                 if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
 
-                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,AM IN,AM OUT,PM IN,PM OUT,Total Hours,Cost Code Used\n";
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Total Hours,Cost Code Used\n";
 
                 logs.forEach(log => {
                     const emp = this.employees.find(e => e.id === log.emp_id) || {};
@@ -1862,7 +2003,7 @@
                     }
 
                     const row = [
-                        log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`,
+                        log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${log.leave_type||''}"`,
                         ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
@@ -1872,6 +2013,58 @@
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
                 link.download = `Timesheet_Export_${isRounded?'Rounded':'Exact'}_${this.getTodayDateStr()}.csv`;
+                link.click();
+            },
+
+            exportIIF(isRounded) {
+                const logs = this.getFilteredRecords();
+                if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
+
+                // Basic IIF header for Time Tracking
+                let iifContent = "!TIMEREC\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tNOTE\n";
+
+                logs.forEach(log => {
+                    const emp = this.employees.find(e => e.id === log.emp_id) || {};
+                    const proj = this.projects.find(p => p.id === log.project_id) || {};
+                    
+                    let ai = log.am_in||'', ao = log.am_out||'', pi = log.pm_in||'', po = log.pm_out||'';
+                    let total = log.total_hrs || 0;
+
+                    if(isRounded) {
+                        ai = this.roundTime15m(ai); ao = this.roundTime15m(ao);
+                        pi = this.roundTime15m(pi); po = this.roundTime15m(po);
+                        total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+                    }
+
+                    if (total > 0 || log.leave_type) {
+                        // Format date to MM/DD/YYYY for QuickBooks
+                        const dateStr = log.date || this.getTodayDateStr();
+                        const [yyyy, mm, dd] = dateStr.split('-');
+                        const qbDate = (yyyy && mm && dd) ? `${mm}/${dd}/${yyyy}` : dateStr;
+                        
+                        // Convert decimal hours to HH:MM format for QuickBooks
+                        const hours = Math.floor(total);
+                        const minutes = Math.round((total - hours) * 60);
+                        const duration = `${hours}:${minutes.toString().padStart(2, '0')}`;
+
+                        const row = [
+                            "TIMEREC",
+                            qbDate,
+                            proj.name || '',
+                            emp.name || '',
+                            log.cost_code_used || '',
+                            '', // PITEM
+                            duration,
+                            log.leave_type ? `Leave: ${log.leave_type}` : ''
+                        ];
+                        iifContent += row.join('\t') + "\n";
+                    }
+                });
+
+                const blob = new Blob([iifContent], { type: 'text/plain;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `Timesheet_Export_${isRounded?'Rounded':'Exact'}_${this.getTodayDateStr()}.iif`;
                 link.click();
             },
 
