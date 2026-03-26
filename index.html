@@ -120,7 +120,7 @@
             <div id="pm-project-selector" class="hidden bg-indigo-50 border border-indigo-200 p-6 rounded-xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
                 <div class="flex-1">
                     <h3 class="font-bold text-indigo-900 text-lg">Active Project Site</h3>
-                    <p class="text-sm text-indigo-700">Select the project you are currently managing. GPS validation required (3km radius).</p>
+                    <p class="text-sm text-indigo-700">Select the project you are currently managing. GPS validation is required if coordinates are configured.</p>
                 </div>
                 <div class="flex items-center gap-3 w-full md:w-auto">
                     <select id="pm-select-project" class="flex-1 md:w-64 px-4 py-2 border border-indigo-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"></select>
@@ -243,7 +243,6 @@
                             <button onclick="app.editEmployee(null)" class="bg-blue-600 text-white px-3 py-1.5 rounded shadow-sm hover:bg-blue-700 transition text-sm flex items-center font-medium">
                                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add Employee
                             </button>
-                            <!-- Updated accept attribute for Excel -->
                             <input type="file" id="excel-file-input" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="hidden">
                         </div>
                     </div>
@@ -525,7 +524,6 @@
 
             async syncNetworkTime() {
                 try {
-                    // Changed to Pacific/Guam timezone
                     const res = await fetch('http://worldtimeapi.org/api/timezone/Pacific/Guam');
                     if(res.ok) {
                         const data = await res.json();
@@ -642,7 +640,11 @@
                 document.getElementById('nav-user-role').innerText = this.profile.role;
 
                 const tabs = ['pm-roster', 'pm-timesheet'];
-                if(this.profile.role === 'admin') tabs.push('admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo');
+                if(this.profile.role === 'admin') {
+                    tabs.push('admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo');
+                } else if (this.profile.role === 'pm' && this.profile.has_demo_access) {
+                    tabs.push('admin-demo');
+                }
 
                 document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => btn.classList.add('hidden'));
                 tabs.forEach(t => {
@@ -690,8 +692,21 @@
                 const pid = document.getElementById('pm-select-project').value;
                 if(!pid) return this.showModal('Notice', 'Please select a project first.');
                 const proj = this.projects.find(p => p.id === pid);
-                if(!proj || !proj.lat || !proj.lng) return this.showModal('Error', 'Project coordinates not configured by admin.');
+                if(!proj) return this.showModal('Error', 'Project not found.');
 
+                // IF COORDINATES ARE MISSING -> BYPASS GPS
+                if(!proj.lat || !proj.lng) {
+                    this.activeProjectId = pid;
+                    document.getElementById('modal-container').classList.add('hidden');
+                    document.getElementById('pm-project-selector').classList.replace('flex', 'hidden');
+                    document.getElementById('roster-locked-view').classList.replace('hidden', 'flex');
+                    document.getElementById('roster-project-name').innerHTML = `${proj.name} <span class="text-xs text-slate-500 ml-2 font-normal">(No GPS Required)</span>`;
+                    this.renderRoster();
+                    this.renderTimesheetEdit();
+                    return;
+                }
+
+                // ELSE -> ENFORCE GPS
                 this.showModal('Verifying Location', 'Please wait while we acquire your GPS coordinates...', false);
 
                 if (!navigator.geolocation) return this.showModal('Error', 'Geolocation is not supported by your browser.');
@@ -1078,10 +1093,10 @@
                 const p = id ? this.projects.find(x=>x.id===id) : {name:'', number:'', lat:'', lng:''};
                 this.showFormModal(id ? 'Edit Project' : 'New Project', `
                     <input type="text" id="fp-name" placeholder="Project Name" value="${p.name}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                    <input type="text" id="fp-num" placeholder="Project Number" value="${p.number}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
+                    <input type="text" id="fp-num" placeholder="Project Number (Optional)" value="${p.number}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
                     <div class="flex gap-3 mb-1">
-                        <input type="text" id="fp-lat" placeholder="Latitude (e.g. 15.123)" value="${p.lat}" class="w-1/2 px-3 py-2 border rounded outline-none">
-                        <input type="text" id="fp-lng" placeholder="Longitude (e.g. 120.456)" value="${p.lng}" class="w-1/2 px-3 py-2 border rounded outline-none">
+                        <input type="text" id="fp-lat" placeholder="Latitude (Optional)" value="${p.lat}" class="w-1/2 px-3 py-2 border rounded outline-none">
+                        <input type="text" id="fp-lng" placeholder="Longitude (Optional)" value="${p.lng}" class="w-1/2 px-3 py-2 border rounded outline-none">
                     </div>
                 `, async () => {
                     const data = {
@@ -1509,11 +1524,16 @@
                         }
                     }
                     
+                    let roleDisplay = `<span class="${u.role==='admin'?'text-blue-600':'text-amber-600'}">${u.role}</span>`;
+                    if (u.role === 'pm' && u.has_demo_access) {
+                        roleDisplay += ` <span class="ml-2 bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] tracking-wide font-bold">+ DEMO</span>`;
+                    }
+                    
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-b">
                             <td class="px-6 py-4 font-medium">${u.name}</td>
                             <td class="px-6 py-4">${u.username}</td>
-                            <td class="px-6 py-4 uppercase text-xs font-bold ${u.role==='admin'?'text-blue-600':'text-amber-600'}">${u.role}</td>
+                            <td class="px-6 py-4 uppercase text-xs font-bold flex items-center">${roleDisplay}</td>
                             <td class="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate" title="${assignedNames}">${assignedNames}</td>
                             <td class="px-6 py-4 text-right space-x-2">
                                 <button onclick="app.editUser('${u.username}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded text-xs font-bold border border-blue-200">EDIT</button>
@@ -1525,7 +1545,7 @@
             },
 
             editUser(username) {
-                const u = username ? this.users.find(x => x.username === username) : { username: '', name: '', role: 'pm', assigned_projects: [] };
+                const u = username ? this.users.find(x => x.username === username) : { username: '', name: '', role: 'pm', assigned_projects: [], has_demo_access: false };
                 
                 const projCheckboxes = this.projects.map(p => {
                     const isChecked = (u.assigned_projects || []).includes(p.id) ? 'checked' : '';
@@ -1541,13 +1561,21 @@
                     <input type="text" id="nu-name" placeholder="Full Name" value="${u.name}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
                     <input type="text" id="nu-username" placeholder="Username" value="${u.username}" class="w-full px-3 py-2 border rounded mb-3 outline-none" ${username ? 'readonly bg-slate-100' : ''}>
                     <input type="password" id="nu-pass" placeholder="${username ? 'Leave blank to keep current password' : 'Password'}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                    <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none mb-3" onchange="document.getElementById('pm-proj-assign').classList.toggle('hidden', this.value !== 'pm')">
+                    <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none mb-3" onchange="document.getElementById('pm-options-container').classList.toggle('hidden', this.value !== 'pm')">
                         <option value="pm" ${u.role === 'pm' ? 'selected' : ''}>Project Manager (PM)</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>System Admin</option>
                     </select>
-                    <div id="pm-proj-assign" class="border border-slate-200 p-3 rounded bg-slate-50 max-h-40 overflow-y-auto ${u.role === 'pm' ? '' : 'hidden'}">
-                        <span class="block text-xs font-bold text-slate-500 uppercase mb-2">Assign Projects</span>
-                        ${projCheckboxes || '<span class="text-xs text-slate-400">No projects available.</span>'}
+                    
+                    <div id="pm-options-container" class="${u.role === 'pm' ? '' : 'hidden'}">
+                        <div class="border border-slate-200 p-3 rounded bg-slate-50 max-h-40 overflow-y-auto mb-3">
+                            <span class="block text-xs font-bold text-slate-500 uppercase mb-2">Assign Projects</span>
+                            ${projCheckboxes || '<span class="text-xs text-slate-400">No projects available.</span>'}
+                        </div>
+                        
+                        <label class="flex items-center space-x-2 text-sm bg-indigo-50 p-3 rounded border border-indigo-100 cursor-pointer mb-2">
+                            <input type="checkbox" id="nu-demo-access" class="w-4 h-4 text-indigo-600 rounded" ${u.has_demo_access ? 'checked' : ''}>
+                            <span class="font-medium text-indigo-900">Grant Demo Controls Access</span>
+                        </label>
                     </div>
                 `, async () => {
                     const un = document.getElementById('nu-username').value.trim().toLowerCase();
@@ -1555,12 +1583,13 @@
                     const pass = document.getElementById('nu-pass').value;
                     const role = document.getElementById('nu-role').value;
                     const assigned_projects = role === 'pm' ? Array.from(document.querySelectorAll('.user-proj-chk:checked')).map(c => c.value) : [];
+                    const has_demo_access = role === 'pm' ? document.getElementById('nu-demo-access').checked : false;
 
                     if(!un || !name) return this.showModal('Error', 'Username and Name are required.');
                     if(!username && !pass) return this.showModal('Error', 'Password is required for new users.');
 
                     try {
-                        const data = { username: un, name, role, assigned_projects };
+                        const data = { username: un, name, role, assigned_projects, has_demo_access };
                         if (pass) data.password = pass; // Only update password if provided
                         await setDoc(docPath('users', un), data, { merge: true });
                         this.hideModal();
