@@ -157,9 +157,6 @@
                         <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-4">
                             <div class="flex items-center gap-4">
                                 <h3 class="font-bold text-slate-800">Employee Roster List</h3>
-                                <button onclick="document.getElementById('excel-file-input').click()" class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded shadow-sm hover:bg-slate-50 transition text-sm flex items-center font-medium">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Import Roster
-                                </button>
                             </div>
                             <label class="flex items-center space-x-2 text-sm font-medium cursor-pointer">
                                 <input type="checkbox" id="check-all-roster" checked class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
@@ -951,34 +948,45 @@
                 submitBtn.disabled = true;
                 
                 try {
-                    const batch = writeBatch(db);
                     let appliedCount = 0;
                     let skippedCount = 0;
 
-                    for(const empId of checked) {
-                        const emp = this.employees.find(e => e.id === empId);
-                        if (!emp) continue;
-                        
-                        const docId = `${empId}_${todayStr}`;
-                        const ref = docPath('timesheets', docId);
-                        
-                        let data = this.timesheets.find(t => t.id === docId);
-                        if(!data) data = { project_id: this.activeProjectId, emp_id: empId, date: todayStr, am_in: '', am_out: '', pm_in: '', pm_out: '', cost_code_used: emp.cost_code_1, total_hrs: 0 };
+                    const chunks = this.chunkArray(checked, 400);
 
-                        // Guard clauses to prevent OUT if IN is missing
-                        if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
-                        if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(db);
+                        let hasUpdatesInChunk = false;
 
-                        let updated = false;
-                        if(type === 'AM_IN' && !data.am_in) { data.am_in = nowTime; updated = true; }
-                        if(type === 'AM_OUT' && !data.am_out) { data.am_out = nowTime; updated = true; }
-                        if(type === 'PM_IN' && !data.pm_in) { data.pm_in = nowTime; updated = true; }
-                        if(type === 'PM_OUT' && !data.pm_out) { data.pm_out = nowTime; updated = true; }
+                        for(const empId of chunk) {
+                            const emp = this.employees.find(e => e.id === empId);
+                            if (!emp) continue;
+                            
+                            const docId = `${empId}_${todayStr}`;
+                            const ref = docPath('timesheets', docId);
+                            
+                            let data = this.timesheets.find(t => t.id === docId);
+                            if(!data) data = { project_id: this.activeProjectId, emp_id: empId, date: todayStr, am_in: '', am_out: '', pm_in: '', pm_out: '', cost_code_used: emp.cost_code_1, total_hrs: 0 };
 
-                        if (updated) {
-                            data.total_hrs = this.calculateHours(data.am_in, data.am_out) + this.calculateHours(data.pm_in, data.pm_out);
-                            batch.set(ref, data, {merge: true});
-                            appliedCount++;
+                            // Guard clauses to prevent OUT if IN is missing
+                            if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
+                            if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
+
+                            let updated = false;
+                            if(type === 'AM_IN' && !data.am_in) { data.am_in = nowTime; updated = true; }
+                            if(type === 'AM_OUT' && !data.am_out) { data.am_out = nowTime; updated = true; }
+                            if(type === 'PM_IN' && !data.pm_in) { data.pm_in = nowTime; updated = true; }
+                            if(type === 'PM_OUT' && !data.pm_out) { data.pm_out = nowTime; updated = true; }
+
+                            if (updated) {
+                                data.total_hrs = this.calculateHours(data.am_in, data.am_out) + this.calculateHours(data.pm_in, data.pm_out);
+                                batch.set(ref, data, {merge: true});
+                                appliedCount++;
+                                hasUpdatesInChunk = true;
+                            }
+                        }
+
+                        if (hasUpdatesInChunk) {
+                            await batch.commit();
                         }
                     }
 
@@ -988,8 +996,6 @@
                         if (skippedCount > 0) reason = `Cannot perform ${type.replace('_', ' ')}. The selected employees do not have a corresponding IN time logged yet.`;
                         return this.showModal('Notice', reason);
                     }
-
-                    await batch.commit();
 
                     this.hideModal();
                     let msg = `Bulk ${type.replace('_', ' ')} applied successfully to ${appliedCount} employees at ${nowTime} (Guam Time).`;
@@ -1021,22 +1027,49 @@
                     const docId = `${emp.id}_${todayStr}`;
                     const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1 };
 
-                    const ccOpts = `<option value="${emp.cost_code_1}" ${log.cost_code_used===emp.cost_code_1?'selected':''}>${emp.cost_code_1}</option>
-                                    ${emp.cost_code_2 ? `<option value="${emp.cost_code_2}" ${log.cost_code_used===emp.cost_code_2?'selected':''}>${emp.cost_code_2}</option>` : ''}`;
+                    let ccOpts = '';
+                    const usedCc = log.cost_code_used || emp.cost_code_1 || '';
+                    const options = new Set();
+                    if (usedCc) options.add(usedCc);
+                    if (emp.cost_code_1) options.add(emp.cost_code_1);
+                    if (emp.cost_code_2) options.add(emp.cost_code_2);
+                    
+                    options.forEach(opt => {
+                        ccOpts += `<option value="${opt}" ${usedCc === opt ? 'selected' : ''}>${opt}</option>`;
+                    });
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
                             <td class="px-4 py-2 font-medium">${emp.emp_id}</td>
                             <td class="px-4 py-2 text-sm">${emp.name}</td>
-                            <td class="px-4 py-2"><input type="time" class="edit-in border rounded px-1 py-0.5 w-24 text-sm" value="${log.am_in}"></td>
-                            <td class="px-4 py-2"><input type="time" class="edit-out border rounded px-1 py-0.5 w-24 text-sm" value="${log.am_out}"></td>
-                            <td class="px-4 py-2"><input type="time" class="edit-in2 border rounded px-1 py-0.5 w-24 text-sm" value="${log.pm_in}"></td>
-                            <td class="px-4 py-2"><input type="time" class="edit-out2 border rounded px-1 py-0.5 w-24 text-sm" value="${log.pm_out}"></td>
-                            <td class="px-4 py-2"><select class="edit-cc border rounded px-1 py-0.5 text-xs w-full max-w-[120px]">${ccOpts}</select></td>
-                            <td class="px-4 py-2"><button onclick="app.saveSingleLog('${emp.id}', '${docId}')" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">SAVE</button></td>
+                            <td class="px-4 py-2"><input type="time" class="edit-in border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_in}" disabled></td>
+                            <td class="px-4 py-2"><input type="time" class="edit-out border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_out}" disabled></td>
+                            <td class="px-4 py-2"><input type="time" class="edit-in2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_in}" disabled></td>
+                            <td class="px-4 py-2"><input type="time" class="edit-out2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_out}" disabled></td>
+                            <td class="px-4 py-2"><select class="edit-cc border rounded px-1 py-0.5 text-xs w-full max-w-[120px] bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>${ccOpts}</select></td>
+                            <td class="px-4 py-2">
+                                <button onclick="app.toggleEditRow('${emp.id}', '${docId}')" class="btn-toggle-edit bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded text-xs font-bold border border-slate-300">EDIT</button>
+                                <button onclick="app.saveSingleLog('${emp.id}', '${docId}')" class="btn-save-edit hidden bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">SAVE</button>
+                            </td>
                         </tr>
                     `;
                 });
+            },
+
+            toggleEditRow(empId, docId) {
+                const row = document.getElementById(`row-${docId}`);
+                const inputs = row.querySelectorAll('input, select');
+                const btnEdit = row.querySelector('.btn-toggle-edit');
+                const btnSave = row.querySelector('.btn-save-edit');
+                
+                inputs.forEach(inp => {
+                    inp.disabled = false;
+                    inp.classList.remove('bg-transparent', 'disabled:opacity-75', 'disabled:border-transparent', 'disabled:appearance-none');
+                    inp.classList.add('bg-white');
+                });
+                
+                btnEdit.classList.add('hidden');
+                btnSave.classList.remove('hidden');
             },
 
             async saveSingleLog(empId, docId) {
@@ -1049,17 +1082,41 @@
 
                 const total = this.calculateHours(am_in, am_out) + this.calculateHours(pm_in, pm_out);
                 
+                const btnSave = row.querySelector('.btn-save-edit');
+                const btnEdit = row.querySelector('.btn-toggle-edit');
+                const origText = btnSave.innerText;
+                btnSave.innerText = "SAVING...";
+                btnSave.disabled = true;
+                
                 try {
                     await setDoc(docPath('timesheets', docId), {
                         project_id: this.activeProjectId, emp_id: empId, date: this.getTodayDateStr(),
                         am_in, am_out, pm_in, pm_out, cost_code_used: cc, total_hrs: total
                     }, {merge: true});
-                    const btn = row.querySelector('button');
-                    const origText = btn.innerText;
-                    btn.innerText = "SAVED!"; btn.classList.replace('text-indigo-700','text-green-700');
+                    
+                    btnSave.innerText = "SAVED!"; btnSave.classList.replace('text-indigo-700','text-green-700');
                     this.showToast('Timesheet record saved.');
-                    setTimeout(() => { btn.innerText = origText; btn.classList.replace('text-green-700','text-indigo-700'); }, 1500);
-                } catch(e) { this.showToast('Failed to save record.', 'error'); }
+                    
+                    setTimeout(() => { 
+                        btnSave.innerText = origText; 
+                        btnSave.classList.replace('text-green-700','text-indigo-700'); 
+                        btnSave.disabled = false;
+                        btnSave.classList.add('hidden');
+                        btnEdit.classList.remove('hidden');
+                        
+                        const inputs = row.querySelectorAll('input, select');
+                        inputs.forEach(inp => {
+                            inp.disabled = true;
+                            inp.classList.add('bg-transparent', 'disabled:opacity-75', 'disabled:border-transparent');
+                            if (inp.tagName === 'SELECT') inp.classList.add('disabled:appearance-none');
+                            inp.classList.remove('bg-white');
+                        });
+                    }, 1000);
+                } catch(e) { 
+                    this.showToast('Failed to save record.', 'error'); 
+                    btnSave.innerText = origText;
+                    btnSave.disabled = false;
+                }
             },
 
             calculateHours(inStr, outStr) {
@@ -1543,7 +1600,7 @@
                 let finalPagesHTML = '';
 
                 // 1. Process "Regular" (Max 30 per page, chunked PER category)
-                const regularEmps = emps.filter(e => e.type === 'Regular');
+                const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location'));
                 const categories = [...new Set(regularEmps.map(e => e.job_category || 'UNASSIGNED'))];
                 
                 categories.forEach(cat => {
@@ -1728,7 +1785,16 @@
                 try {
                     const submitBtn = document.getElementById('btn-modal-confirm');
                     submitBtn.innerText = "Deleting..."; submitBtn.disabled = true;
-                    for(const rec of recordsToDelete) await deleteDoc(docPath('timesheets', rec.id));
+                    
+                    const chunks = this.chunkArray(recordsToDelete, 400);
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(db);
+                        chunk.forEach(rec => {
+                            batch.delete(docPath('timesheets', rec.id));
+                        });
+                        await batch.commit();
+                    }
+                    
                     this.hideModal(); this.showModal("Success", `${recordsToDelete.length} records have been permanently deleted.`);
                 } catch(e) {
                     this.showModal("Database Error", "Failed to delete records.");
