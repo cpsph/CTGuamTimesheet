@@ -25,9 +25,11 @@
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; font-family: 'Times New Roman', Times, serif; display: block; }
-            .print-page { page-break-after: always; padding: 20px; width: 100%; box-sizing: border-box; }
+            .print-page { page-break-after: always; padding: 20px; width: 100%; height: 250mm; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; }
             .print-page:last-child { page-break-after: auto; }
+            .print-content { display: flex; flex-direction: column; flex-grow: 1; }
             .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; }
+            .print-table tr { page-break-inside: avoid; }
             .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; }
             .print-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
             .print-logo-box { width: 100px; height: 50px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; }
@@ -38,7 +40,7 @@
             .print-meta-label { width: 120px; font-weight: bold; }
             .job-category-row { font-weight: bold; text-align: left !important; background-color: #f3f4f6; padding-left: 20px !important; }
             .footer-notes { margin-top: 20px; font-size: 10px; }
-            @page { size: landscape; margin: 10mm; }
+            @page { size: letter portrait; margin: 10mm; }
         }
     </style>
 </head>
@@ -1440,46 +1442,48 @@
             createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rowsHTML) {
                 return `
                 <div class="print-page">
-                    <div class="print-header">
-                        <div class="print-logo-box">
-                            ${compLogo ? `<img src="${compLogo}" style="max-width:100%; max-height:100%;">` : 'LOGO HERE'}
+                    <div class="print-content">
+                        <div class="print-header">
+                            <div class="print-logo-box">
+                                ${compLogo ? `<img src="${compLogo}" style="max-width:100%; max-height:100%;">` : 'LOGO HERE'}
+                            </div>
+                            <div class="print-company-info">
+                                <strong>${compName}</strong><br>
+                                <div style="white-space: pre-wrap;">${compAddr}</div>
+                            </div>
+                            <div style="width:100px;"></div> <!-- Spacer -->
                         </div>
-                        <div class="print-company-info">
-                            <strong>${compName}</strong><br>
-                            <div style="white-space: pre-wrap;">${compAddr}</div>
+                        
+                        <div class="print-meta">
+                            <div class="print-meta-row"><span class="print-meta-label">DATE:</span> ${todayStr}</div>
+                            <div class="print-meta-row"><span class="print-meta-label">PROJECT TITLE:</span> ${proj.name}</div>
+                            <div class="print-meta-row"><span class="print-meta-label">PROJECT NUMBER:</span> ${proj.number || ''}</div>
                         </div>
-                        <div style="width:100px;"></div> <!-- Spacer -->
-                    </div>
-                    
-                    <div class="print-meta">
-                        <div class="print-meta-row"><span class="print-meta-label">DATE:</span> ${todayStr}</div>
-                        <div class="print-meta-row"><span class="print-meta-label">PROJECT TITLE:</span> ${proj.name}</div>
-                        <div class="print-meta-row"><span class="print-meta-label">PROJECT NUMBER:</span> ${proj.number || ''}</div>
-                    </div>
 
-                    <div class="print-title">DAILY TIME RECORD</div>
+                        <div class="print-title">DAILY TIME RECORD</div>
 
-                    <table class="print-table">
-                        <thead>
-                            <tr>
-                                <th rowspan="2" style="width:30px;">NO</th>
-                                <th rowspan="2" style="width:60px;">Employee<br>ID</th>
-                                <th rowspan="2" style="width:80px;">COST CODE</th>
-                                <th rowspan="2" style="width:180px;">NAME</th>
-                                <th colspan="2">AM</th>
-                                <th colspan="2">PM</th>
-                                <th rowspan="2">TOTAL HRS</th>
-                                <th rowspan="2">EE SIGNATURE<br>I certify that the total hours<br>opposite my name are correct</th>
-                            </tr>
-                            <tr>
-                                <th style="width:50px;">IN</th><th style="width:50px;">OUT</th>
-                                <th style="width:50px;">IN</th><th style="width:50px;">OUT</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHTML}
-                        </tbody>
-                    </table>
+                        <table class="print-table">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" style="width:30px;">NO</th>
+                                    <th rowspan="2" style="width:60px;">Employee<br>ID</th>
+                                    <th rowspan="2" style="width:80px;">COST CODE</th>
+                                    <th rowspan="2" style="width:180px;">NAME</th>
+                                    <th colspan="2">AM</th>
+                                    <th colspan="2">PM</th>
+                                    <th rowspan="2">TOTAL HRS</th>
+                                    <th rowspan="2">EE SIGNATURE<br>I certify that the total hours<br>opposite my name are correct</th>
+                                </tr>
+                                <tr>
+                                    <th style="width:50px;">IN</th><th style="width:50px;">OUT</th>
+                                    <th style="width:50px;">IN</th><th style="width:50px;">OUT</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHTML}
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div class="footer-notes">
                         <p><strong>NOTE:</strong><br>1. Please make sure that all entries in this DTR are complete and final before submitting to Payroll-In-Charge.<br>2. This should always be submitted to Payroll-In-Charge at the end of the day.</p>
@@ -1600,13 +1604,13 @@
 
                 let finalPagesHTML = '';
 
-                // 1. Process "Regular" (Max 30 per page, chunked PER category)
+                // 1. Process "Regular" (Max 20 per page, chunked PER category)
                 const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location'));
                 const categories = [...new Set(regularEmps.map(e => e.job_category || 'UNASSIGNED'))];
                 
                 categories.forEach(cat => {
                     const catEmps = regularEmps.filter(e => (e.job_category || 'UNASSIGNED') === cat);
-                    const chunks = this.chunkArray(catEmps, 30);
+                    const chunks = this.chunkArray(catEmps, 20);
                     chunks.forEach(chunk => {
                         let rows = `<tr><td colspan="10" class="job-category-row">${cat}</td></tr>`;
                         chunk.forEach((emp, idx) => {
@@ -1616,10 +1620,10 @@
                     });
                 });
 
-                // 2. Process "Local" (Max 15 per page, combined categories, category header row injected)
+                // 2. Process "Local" (Max 20 per page, combined categories, category header row injected)
                 const localEmps = emps.filter(e => e.type === 'Local').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
                 if(localEmps.length > 0) {
-                    const chunks = this.chunkArray(localEmps, 15);
+                    const chunks = this.chunkArray(localEmps, 20);
                     chunks.forEach(chunk => {
                         let rows = '';
                         let currentCat = null;
@@ -1635,10 +1639,10 @@
                     });
                 }
 
-                // 3. Process "Other Location" (Max 15 per page, same logic as Local)
+                // 3. Process "Other Location" (Max 20 per page, same logic as Local)
                 const otherEmps = emps.filter(e => e.type === 'Other Location').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
                 if(otherEmps.length > 0) {
-                    const chunks = this.chunkArray(otherEmps, 15);
+                    const chunks = this.chunkArray(otherEmps, 20);
                     chunks.forEach(chunk => {
                         let rows = '';
                         let currentCat = null;
@@ -2012,9 +2016,19 @@
                 const btnCancel = document.getElementById('btn-modal-cancel');
                 const btnConfirm = document.getElementById('btn-modal-confirm');
                 
+                // Reset button state
+                btnConfirm.innerHTML = showCancel ? 'Confirm' : 'OK';
+                btnConfirm.disabled = false;
+                
                 if(showCancel) btnCancel.classList.remove('hidden'); else btnCancel.classList.add('hidden');
                 
-                btnConfirm.onclick = () => { if(confirmCb) confirmCb(); this.hideModal(); };
+                btnConfirm.onclick = async () => { 
+                    if(confirmCb) {
+                        await confirmCb();
+                    } else {
+                        this.hideModal(); 
+                    }
+                };
                 btnCancel.onclick = () => this.hideModal();
                 
                 document.getElementById('modal-container').classList.remove('hidden');
