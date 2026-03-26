@@ -765,35 +765,127 @@
                 };
             },
 
-            async bulkAction(type) {
+            bulkAction(type) {
                 if(!this.activeProjectId) return;
-                const checked = Array.from(document.querySelectorAll('.roster-chk:checked')).map(c => c.value);
-                if(checked.length === 0) return this.showModal('Notice', 'No employees selected.');
+                
+                const typeLabels = { 'AM_IN': 'AM IN', 'AM_OUT': 'AM OUT', 'PM_IN': 'PM IN', 'PM_OUT': 'PM OUT' };
+                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                
+                if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
+
+                let empListHtml = `<div class="max-h-[40vh] overflow-y-auto border border-slate-300 rounded p-2 mb-4 bg-slate-50 divide-y divide-slate-200">`;
+                
+                let preCheckedCount = 0;
+                emps.forEach(emp => {
+                    // Carry over the checkbox state from the main table
+                    const mainTableChk = document.querySelector(`.roster-chk[value="${emp.id}"]`);
+                    const isChecked = mainTableChk && mainTableChk.checked ? 'checked' : '';
+                    if (isChecked) preCheckedCount++;
+                    
+                    empListHtml += `
+                        <label class="flex items-center space-x-3 py-2 cursor-pointer hover:bg-slate-100 px-2 rounded transition">
+                            <input type="checkbox" class="modal-roster-chk w-4 h-4 text-blue-600 rounded" value="${emp.id}" ${isChecked}>
+                            <div class="flex flex-col">
+                                <span class="text-sm font-bold text-slate-800">${emp.name}</span>
+                                <span class="text-xs text-slate-500">${emp.emp_id} | ${emp.job_category || 'N/A'}</span>
+                            </div>
+                        </label>
+                    `;
+                });
+                empListHtml += `</div>`;
+
+                const formHtml = `
+                    <div class="mb-2">
+                        <div class="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-200 mb-4 text-sm">
+                            You are about to log <strong>${typeLabels[type]}</strong>. Please explicitly uncheck any employee who is absent or not yet on site before confirming.
+                        </div>
+                        <label class="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer mb-3 px-2">
+                            <input type="checkbox" id="modal-check-all" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" ${preCheckedCount === emps.length ? 'checked' : ''}>
+                            <span>Toggle All Employees</span>
+                        </label>
+                        ${empListHtml}
+                    </div>
+                `;
+
+                this.showFormModal(`Confirm Bulk ${typeLabels[type]}`, formHtml, () => {
+                    this.executeBulkActionBatch(type);
+                });
+
+                // Attach toggle listener after modal renders
+                setTimeout(() => {
+                    const selectAll = document.getElementById('modal-check-all');
+                    if(selectAll) {
+                        selectAll.onchange = (e) => {
+                            document.querySelectorAll('.modal-roster-chk').forEach(c => c.checked = e.target.checked);
+                        };
+                        
+                        // Update "Toggle All" state if individual checkboxes change
+                        const chks = document.querySelectorAll('.modal-roster-chk');
+                        chks.forEach(chk => {
+                            chk.onchange = () => {
+                                selectAll.checked = (document.querySelectorAll('.modal-roster-chk:checked').length === chks.length);
+                            };
+                        });
+                    }
+                }, 50);
+            },
+
+            async executeBulkActionBatch(type) {
+                // Read from the confirmation modal, not the background table
+                const checked = Array.from(document.querySelectorAll('.modal-roster-chk:checked')).map(c => c.value);
+                if(checked.length === 0) {
+                    this.hideModal();
+                    return this.showModal('Notice', 'No employees selected. Action cancelled.');
+                }
 
                 const todayStr = this.getTodayDateStr();
                 const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
 
+                this.hideModal(); // hide the confirm modal
+                
                 try {
                     const batch = writeBatch(db);
+                    let appliedCount = 0;
+                    let skippedCount = 0;
+
                     for(const empId of checked) {
                         const emp = this.employees.find(e => e.id === empId);
+                        if (!emp) continue;
+                        
                         const docId = `${empId}_${todayStr}`;
                         const ref = docPath('timesheets', docId);
                         
                         let data = this.timesheets.find(t => t.id === docId);
                         if(!data) data = { project_id: this.activeProjectId, emp_id: empId, date: todayStr, am_in: '', am_out: '', pm_in: '', pm_out: '', cost_code_used: emp.cost_code_1, total_hrs: 0 };
 
-                        if(type === 'AM_IN' && !data.am_in) data.am_in = nowTime;
-                        if(type === 'AM_OUT' && !data.am_out) data.am_out = nowTime;
-                        if(type === 'PM_IN' && !data.pm_in) data.pm_in = nowTime;
-                        if(type === 'PM_OUT' && !data.pm_out) data.pm_out = nowTime;
+                        // Guard clauses to prevent OUT if IN is missing
+                        if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
+                        if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
 
-                        data.total_hrs = this.calculateHours(data.am_in, data.am_out) + this.calculateHours(data.pm_in, data.pm_out);
-                        batch.set(ref, data, {merge: true});
+                        let updated = false;
+                        if(type === 'AM_IN' && !data.am_in) { data.am_in = nowTime; updated = true; }
+                        if(type === 'AM_OUT' && !data.am_out) { data.am_out = nowTime; updated = true; }
+                        if(type === 'PM_IN' && !data.pm_in) { data.pm_in = nowTime; updated = true; }
+                        if(type === 'PM_OUT' && !data.pm_out) { data.pm_out = nowTime; updated = true; }
+
+                        if (updated) {
+                            data.total_hrs = this.calculateHours(data.am_in, data.am_out) + this.calculateHours(data.pm_in, data.pm_out);
+                            batch.set(ref, data, {merge: true});
+                            appliedCount++;
+                        }
+                    }
+
+                    if (appliedCount === 0) {
+                        let reason = "No actions were applied. Employees may already have this time logged.";
+                        if (skippedCount > 0) reason = `Cannot perform ${type.replace('_', ' ')}. The selected employees do not have a corresponding IN time logged yet.`;
+                        return this.showModal('Notice', reason);
                     }
 
                     await batch.commit();
-                    this.showModal('Success', `Bulk ${type.replace('_', ' ')} applied successfully to ${checked.length} employees at ${nowTime} (Guam Time).`);
+
+                    let msg = `Bulk ${type.replace('_', ' ')} applied successfully to ${appliedCount} employees at ${nowTime} (Guam Time).`;
+                    if (skippedCount > 0) msg += `<br><br><span class="text-amber-600 font-bold">Note: ${skippedCount} employee(s) were skipped because they lacked a required IN time.</span>`;
+                    this.showModal('Success', msg);
                 } catch(e) { console.error(e); this.showModal('Error', 'Failed to save bulk action to database.'); }
             },
 
