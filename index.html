@@ -1496,59 +1496,70 @@
                 this.showModal('Processing Data', 'Updating database... please wait.', false);
                 
                 try {
-                    const batch = writeBatch(db);
                     let projCache = {}; 
                     
-                    // Skip header row (i=1)
-                    for(let i=1; i<rows.length; i++) {
-                        // Ensure all columns are cast to strings and trimmed
-                        const cols = rows[i].map(c => String(c || '').trim());
-                        if(cols.length < 6) continue;
-                        
-                        // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC
-                        const [pName, eId, eName, jobCat, typeRaw, cc1, cc2] = cols;
-                        if(!pName || !eName || !eId) continue;
+                    // Skip header row and chunk the data to avoid Firestore 500 write limit
+                    const chunks = this.chunkArray(rows.slice(1), 400);
+                    
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(db);
+                        let hasWrites = false;
 
-                        let type = 'Regular';
-                        if(typeRaw) {
-                            const tL = typeRaw.toLowerCase();
-                            if(tL.includes('local')) type = 'Local';
-                            else if(tL.includes('other')) type = 'Other Location';
-                        }
+                        for(let i=0; i<chunk.length; i++) {
+                            // Ensure all columns are cast to strings and trimmed
+                            const cols = chunk[i].map(c => String(c || '').trim());
+                            if(cols.length < 6) continue;
+                            
+                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC
+                            const [pName, eId, eName, jobCat, typeRaw, cc1, cc2] = cols;
+                            if(!pName || !eName || !eId) continue;
 
-                        let projId = projCache[pName];
-                        if(!projId) {
-                            let existP = this.projects.find(p => p.name.toLowerCase() === pName.toLowerCase());
-                            if(existP) projId = existP.id;
-                            else {
-                                // PMs can't create new projects via upload
-                                if (this.currentUser.role !== 'admin') {
+                            let type = 'Regular';
+                            if(typeRaw) {
+                                const tL = typeRaw.toLowerCase();
+                                if(tL.includes('local')) type = 'Local';
+                                else if(tL.includes('other')) type = 'Other Location';
+                            }
+
+                            let projId = projCache[pName];
+                            if(!projId) {
+                                let existP = this.projects.find(p => p.name.toLowerCase() === pName.toLowerCase());
+                                if(existP) projId = existP.id;
+                                else {
+                                    // PMs can't create new projects via upload
+                                    if (this.profile.role !== 'admin') {
+                                        continue; // Skip this row
+                                    }
+                                    const newPref = doc(collPath('projects'));
+                                    projId = newPref.id;
+                                    batch.set(newPref, { name: pName, number: '', lat: '', lng: ''});
+                                    hasWrites = true;
+                                    this.projects.push({id: projId, name: pName}); 
+                                }
+                                projCache[pName] = projId;
+                            }
+
+                            // If PM, check if they are assigned to this project
+                            if (this.profile.role !== 'admin') {
+                                if (!this.profile.assigned_projects || !this.profile.assigned_projects.includes(projId)) {
                                     continue; // Skip this row
                                 }
-                                const newPref = doc(collPath('projects'));
-                                projId = newPref.id;
-                                batch.set(newPref, { name: pName, number: '', lat: '', lng: ''});
-                                this.projects.push({id: projId, name: pName}); 
                             }
-                            projCache[pName] = projId;
+
+                            const safeEmpId = eId.replace(/\W/g, ''); 
+                            const empRef = docPath('employees', safeEmpId);
+                            batch.set(empRef, {
+                                project_id: projId, emp_id: eId, name: eName, 
+                                job_category: jobCat || '', type: type, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
+                            }, {merge: true});
+                            hasWrites = true;
                         }
 
-                        // If PM, check if they are assigned to this project
-                        if (this.currentUser.role !== 'admin') {
-                            if (!this.currentUser.assigned_projects || !this.currentUser.assigned_projects.includes(projId)) {
-                                continue; // Skip this row
-                            }
+                        if (hasWrites) {
+                            await batch.commit();
                         }
-
-                        const safeEmpId = eId.replace(/\W/g, ''); 
-                        const empRef = docPath('employees', safeEmpId);
-                        batch.set(empRef, {
-                            project_id: projId, emp_id: eId, name: eName, 
-                            job_category: jobCat || '', type: type, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
-                        }, {merge: true});
                     }
 
-                    await batch.commit();
                     this.hideModal();
                     this.showModal('Success', 'Roster Data successfully imported and synchronized from Excel/CSV.');
                 } catch(err) {
