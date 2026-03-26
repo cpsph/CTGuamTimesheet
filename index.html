@@ -83,11 +83,14 @@
                     <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
                     <input type="text" id="login-username" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">
                 </div>
-                <div>
+                <div class="relative">
                     <label class="block text-sm font-medium text-slate-700 mb-1 mt-3">Password</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">
+                    <input type="password" id="login-password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none pr-10">
+                    <button type="button" onclick="const p = document.getElementById('login-password'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-[34px] text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    </button>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow transition mt-4">Secure Sign In</button>
+                <button type="submit" id="btn-login-submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow transition mt-4 flex justify-center items-center">Secure Sign In</button>
             </form>
         </div>
 
@@ -151,8 +154,13 @@
                     </div>
 
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                            <h3 class="font-bold text-slate-800">Employee Roster List</h3>
+                        <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div class="flex items-center gap-4">
+                                <h3 class="font-bold text-slate-800">Employee Roster List</h3>
+                                <button onclick="document.getElementById('excel-file-input').click()" class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded shadow-sm hover:bg-slate-50 transition text-sm flex items-center font-medium">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Import Roster
+                                </button>
+                            </div>
                             <label class="flex items-center space-x-2 text-sm font-medium cursor-pointer">
                                 <input type="checkbox" id="check-all-roster" checked class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
                                 <span>Select All Present</span>
@@ -337,6 +345,13 @@
 
             <!-- ADMIN: SYSTEM USERS -->
             <div id="tab-content-admin-users" class="hidden space-y-6 fade-in">
+                <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start space-x-3">
+                    <svg class="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <div>
+                        <h4 class="text-amber-800 font-bold text-sm">Security Recommendation</h4>
+                        <p class="text-amber-700 text-xs mt-1">Passwords are currently stored in plain text within the database to maintain compatibility with your original code. For a production environment, it is highly recommended to migrate to <strong>Firebase Authentication</strong> for secure credential management.</p>
+                    </div>
+                </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                         <h3 class="font-bold text-slate-800">System Managers & Admins</h3>
@@ -435,6 +450,9 @@
 
         </div>
     </main>
+
+    <!-- Toast Notification System -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
     <!-- Modal System -->
     <div id="modal-container" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
@@ -548,6 +566,24 @@
                 } catch(e) { console.error("Initial admin check failed.", e); }
             },
 
+            showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                const bgColor = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-blue-600');
+                toast.className = `${bgColor} text-white px-4 py-3 rounded shadow-lg flex items-center space-x-2 transform transition-all duration-300 translate-y-10 opacity-0`;
+                toast.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${type === 'success' ? 'M5 13l4 4L19 7' : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"></path></svg>
+                    <span class="font-medium text-sm">${message}</span>
+                `;
+                container.appendChild(toast);
+                
+                setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 10);
+                setTimeout(() => {
+                    toast.classList.add('opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            },
+
             async verifySession() {
                 const sessionUser = localStorage.getItem('pm_session_username');
                 if (sessionUser) {
@@ -566,6 +602,11 @@
 
             async handleLogin(e) {
                 e.preventDefault();
+                const btn = document.getElementById('btn-login-submit');
+                const origText = btn.innerHTML;
+                btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Authenticating...`;
+                btn.disabled = true;
+
                 const username = document.getElementById('login-username').value.trim().toLowerCase();
                 const pass = document.getElementById('login-password').value;
                 try {
@@ -575,11 +616,15 @@
                         localStorage.setItem('pm_session_username', username);
                         this.setupListeners();
                         this.showDashboard();
+                        this.showToast('Successfully signed in.');
                     } else {
                         this.showModal('Login Failed', 'Invalid username or password.');
                     }
                 } catch(e) {
                     this.showModal('Error', 'Database connection failed.');
+                } finally {
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
                 }
             },
 
@@ -689,6 +734,9 @@
             },
 
             async validateGPS() {
+                const btn = document.getElementById('btn-validate-gps');
+                const origText = btn.innerHTML;
+                
                 const pid = document.getElementById('pm-select-project').value;
                 if(!pid) return this.showModal('Notice', 'Please select a project first.');
                 const proj = this.projects.find(p => p.id === pid);
@@ -707,12 +755,19 @@
                 }
 
                 // ELSE -> ENFORCE GPS
-                this.showModal('Verifying Location', 'Please wait while we acquire your GPS coordinates...', false);
+                btn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Locating...`;
+                btn.disabled = true;
 
-                if (!navigator.geolocation) return this.showModal('Error', 'Geolocation is not supported by your browser.');
+                if (!navigator.geolocation) {
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                    return this.showModal('Error', 'Geolocation is not supported by your browser.');
+                }
 
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
                         const dist = this.haversineDistance(pos.coords.latitude, pos.coords.longitude, parseFloat(proj.lat), parseFloat(proj.lng));
                         if(dist <= 3000) { 
                             this.activeProjectId = pid;
@@ -722,11 +777,16 @@
                             document.getElementById('roster-project-name').innerText = proj.name;
                             this.renderRoster();
                             this.renderTimesheetEdit();
+                            this.showToast('GPS Location Verified.');
                         } else {
                             this.showModal('Access Denied', `You are ${Math.round(dist)} meters away from the site. Must be within 3,000 meters.`);
                         }
                     },
-                    (err) => { this.showModal('GPS Error', `Failed to get location: ${err.message}. Please allow location access.`); },
+                    (err) => { 
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                        this.showModal('GPS Error', `Failed to get location: ${err.message}. Please allow location access.`); 
+                    },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
             },
@@ -756,7 +816,10 @@
                 tbody.innerHTML = '';
 
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId);
-                if(emps.length === 0) return tbody.innerHTML = `<tr><td colspan=\"6\" class=\"px-6 py-4 text-center\">No employees found for this project.</td></tr>`;
+                if(emps.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
+                    return;
+                }
 
                 emps.forEach(emp => {
                     const logId = `${emp.id}_${todayStr}`;
@@ -798,7 +861,7 @@
                     if (isChecked) preCheckedCount++;
                     
                     empListHtml += `
-                        <label class="flex items-center space-x-3 py-2 cursor-pointer hover:bg-slate-100 px-2 rounded transition">
+                        <label class="modal-roster-item flex items-center space-x-3 py-2 cursor-pointer hover:bg-slate-100 px-2 rounded transition" data-name="${emp.name}" data-id="${emp.emp_id}">
                             <input type="checkbox" class="modal-roster-chk w-4 h-4 text-blue-600 rounded" value="${emp.id}" ${isChecked}>
                             <div class="flex flex-col">
                                 <span class="text-sm font-bold text-slate-800">${emp.name}</span>
@@ -814,10 +877,13 @@
                         <div class="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-200 mb-4 text-sm">
                             You are about to log <strong>${typeLabels[type]}</strong>. Please explicitly uncheck any employee who is absent or not yet on site before confirming.
                         </div>
-                        <label class="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer mb-3 px-2">
-                            <input type="checkbox" id="modal-check-all" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" ${preCheckedCount === emps.length ? 'checked' : ''}>
-                            <span>Toggle All Employees</span>
-                        </label>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 px-2">
+                            <label class="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="modal-check-all" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" ${preCheckedCount === emps.length ? 'checked' : ''}>
+                                <span>Toggle All Employees</span>
+                            </label>
+                            <input type="text" id="modal-emp-search" placeholder="Search employee..." class="px-3 py-1.5 border border-slate-300 rounded text-sm w-full sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
                         ${empListHtml}
                     </div>
                 `;
@@ -831,16 +897,39 @@
                     const selectAll = document.getElementById('modal-check-all');
                     if(selectAll) {
                         selectAll.onchange = (e) => {
-                            document.querySelectorAll('.modal-roster-chk').forEach(c => c.checked = e.target.checked);
+                            document.querySelectorAll('.modal-roster-item:not(.hidden) .modal-roster-chk').forEach(c => c.checked = e.target.checked);
                         };
                         
                         // Update "Toggle All" state if individual checkboxes change
                         const chks = document.querySelectorAll('.modal-roster-chk');
                         chks.forEach(chk => {
                             chk.onchange = () => {
-                                selectAll.checked = (document.querySelectorAll('.modal-roster-chk:checked').length === chks.length);
+                                const visibleChks = document.querySelectorAll('.modal-roster-item:not(.hidden) .modal-roster-chk');
+                                const visibleChecked = document.querySelectorAll('.modal-roster-item:not(.hidden) .modal-roster-chk:checked');
+                                selectAll.checked = (visibleChecked.length === visibleChks.length && visibleChks.length > 0);
                             };
                         });
+                    }
+
+                    const searchInput = document.getElementById('modal-emp-search');
+                    if (searchInput) {
+                        searchInput.onkeyup = (e) => {
+                            const term = e.target.value.toLowerCase();
+                            document.querySelectorAll('.modal-roster-item').forEach(item => {
+                                const name = item.getAttribute('data-name').toLowerCase();
+                                const id = item.getAttribute('data-id').toLowerCase();
+                                if (name.includes(term) || id.includes(term)) {
+                                    item.classList.remove('hidden');
+                                } else {
+                                    item.classList.add('hidden');
+                                }
+                            });
+                            if (selectAll) {
+                                const visibleChks = document.querySelectorAll('.modal-roster-item:not(.hidden) .modal-roster-chk');
+                                const visibleChecked = document.querySelectorAll('.modal-roster-item:not(.hidden) .modal-roster-chk:checked');
+                                selectAll.checked = (visibleChecked.length === visibleChks.length && visibleChks.length > 0);
+                            }
+                        };
                     }
                 }, 50);
             },
@@ -856,7 +945,10 @@
                 const todayStr = this.getTodayDateStr();
                 const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
 
-                this.hideModal(); // hide the confirm modal
+                const submitBtn = document.getElementById('btn-modal-confirm');
+                const origText = submitBtn.innerText;
+                submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                submitBtn.disabled = true;
                 
                 try {
                     const batch = writeBatch(db);
@@ -891,6 +983,7 @@
                     }
 
                     if (appliedCount === 0) {
+                        this.hideModal();
                         let reason = "No actions were applied. Employees may already have this time logged.";
                         if (skippedCount > 0) reason = `Cannot perform ${type.replace('_', ' ')}. The selected employees do not have a corresponding IN time logged yet.`;
                         return this.showModal('Notice', reason);
@@ -898,10 +991,16 @@
 
                     await batch.commit();
 
+                    this.hideModal();
                     let msg = `Bulk ${type.replace('_', ' ')} applied successfully to ${appliedCount} employees at ${nowTime} (Guam Time).`;
                     if (skippedCount > 0) msg += `<br><br><span class="text-amber-600 font-bold">Note: ${skippedCount} employee(s) were skipped because they lacked a required IN time.</span>`;
                     this.showModal('Success', msg);
-                } catch(e) { console.error(e); this.showModal('Error', 'Failed to save bulk action to database.'); }
+                } catch(e) { 
+                    console.error(e); 
+                    submitBtn.innerHTML = origText;
+                    submitBtn.disabled = false;
+                    this.showModal('Error', 'Failed to save bulk action to database.'); 
+                }
             },
 
             // --- PM REVIEW & EDIT TIMESHEET ---
@@ -913,6 +1012,11 @@
 
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
                 
+                if(emps.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
+                    return;
+                }
+
                 emps.forEach(emp => {
                     const docId = `${emp.id}_${todayStr}`;
                     const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1 };
@@ -953,8 +1057,9 @@
                     const btn = row.querySelector('button');
                     const origText = btn.innerText;
                     btn.innerText = "SAVED!"; btn.classList.replace('text-indigo-700','text-green-700');
+                    this.showToast('Timesheet record saved.');
                     setTimeout(() => { btn.innerText = origText; btn.classList.replace('text-green-700','text-indigo-700'); }, 1500);
-                } catch(e) { this.showModal('Error', 'Failed to save record.'); }
+                } catch(e) { this.showToast('Failed to save record.', 'error'); }
             },
 
             calculateHours(inStr, outStr) {
@@ -979,7 +1084,7 @@
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
                 if(emps.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No employees found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found.</span></div></td></tr>`;
                     return;
                 }
 
@@ -1048,6 +1153,11 @@
                     
                     if(!eId || !pId || !name) return this.showModal('Error', 'Project, Employee ID, and Name are strictly required.');
 
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                    submitBtn.disabled = true;
+
                     const safeId = eId.replace(/\W/g, ''); // Ensure safe document ID
                     try {
                         await setDoc(docPath('employees', safeId), {
@@ -1058,24 +1168,44 @@
                             cost_code_2: document.getElementById('fe-cc2').value.trim()
                         }, {merge:true});
                         this.hideModal();
-                    } catch(e) { this.showModal('Error', 'Failed to save employee.'); }
+                        this.showToast('Employee saved successfully.');
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to save employee.'); 
+                    }
                 });
             },
 
             deleteEmployee(id) {
                 this.showFormModal('Confirm Deletion', 'Are you sure you want to remove this employee from the roster? Note: Their historical timesheet records will NOT be deleted.', async () => {
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Deleting...`;
+                    submitBtn.disabled = true;
+
                     try {
                         await deleteDoc(docPath('employees', id));
                         this.hideModal();
-                    } catch(e) { this.showModal('Error', 'Failed to delete employee.'); }
+                        this.showToast('Employee deleted successfully.');
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to delete employee.'); 
+                    }
                 });
             },
-
             // --- ADMIN: PROJECTS ---
             renderProjects() {
                 const c = document.getElementById('projects-list-container');
                 if(!c) return;
                 c.innerHTML = '';
+                
+                if(this.projects.length === 0) {
+                    c.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg><span>No projects found.</span></div></div>`;
+                    return;
+                }
+
                 this.projects.forEach(p => {
                     c.innerHTML += `
                         <div class="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col relative">
@@ -1104,11 +1234,22 @@
                         lat: document.getElementById('fp-lat').value, lng: document.getElementById('fp-lng').value
                     };
                     if(!data.name) return;
+
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                    submitBtn.disabled = true;
+
                     try {
                         const ref = id ? docPath('projects', id) : doc(collPath('projects'));
                         await setDoc(ref, data, {merge:true});
                         this.hideModal();
-                    } catch(e) { this.showModal('Error', 'Failed to save project.'); }
+                        this.showToast('Project saved successfully.');
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to save project.'); 
+                    }
                 });
             },
 
@@ -1173,12 +1314,23 @@
                             let existP = this.projects.find(p => p.name.toLowerCase() === pName.toLowerCase());
                             if(existP) projId = existP.id;
                             else {
+                                // PMs can't create new projects via upload
+                                if (this.currentUser.role !== 'admin') {
+                                    continue; // Skip this row
+                                }
                                 const newPref = doc(collPath('projects'));
                                 projId = newPref.id;
                                 batch.set(newPref, { name: pName, number: '', lat: '', lng: ''});
                                 this.projects.push({id: projId, name: pName}); 
                             }
                             projCache[pName] = projId;
+                        }
+
+                        // If PM, check if they are assigned to this project
+                        if (this.currentUser.role !== 'admin') {
+                            if (!this.currentUser.assigned_projects || !this.currentUser.assigned_projects.includes(projId)) {
+                                continue; // Skip this row
+                            }
                         }
 
                         const safeEmpId = eId.replace(/\W/g, ''); 
@@ -1207,7 +1359,9 @@
                 return chunked;
             },
 
-            generateEmployeePrintRow(emp, num, log) {
+            generateEmployeePrintRow(emp, num, log, absentIds = []) {
+                const isAbsent = absentIds.includes(emp.id);
+                const sigContent = isAbsent ? '<span style="font-weight:bold; color:red;">ABSENT</span>' : '';
                 return `
                     <tr>
                         <td>${num}</td>
@@ -1216,11 +1370,10 @@
                         <td style="text-align:left;">${emp.name}</td>
                         <td>${log.am_in||''}</td>
                         <td>${log.am_out||''}</td>
-                        <td></td> <!-- EE INITIAL -->
                         <td>${log.pm_in||''}</td>
                         <td>${log.pm_out||''}</td>
                         <td>${(log.total_hrs||0).toFixed(2)}</td>
-                        <td></td> <!-- EE SIGNATURE -->
+                        <td>${sigContent}</td> <!-- EE SIGNATURE -->
                     </tr>
                 `;
             },
@@ -1255,7 +1408,6 @@
                                 <th rowspan="2" style="width:80px;">COST CODE</th>
                                 <th rowspan="2" style="width:180px;">NAME</th>
                                 <th colspan="2">AM</th>
-                                <th rowspan="2">EE INITIAL<br>OR<br>SIGNATURE</th>
                                 <th colspan="2">PM</th>
                                 <th rowspan="2">TOTAL HRS</th>
                                 <th rowspan="2">EE SIGNATURE<br>I certify that the total hours<br>opposite my name are correct</th>
@@ -1286,6 +1438,99 @@
                 if(!this.activeProjectId) return;
                 const proj = this.projects.find(p => p.id === this.activeProjectId);
                 const todayStr = this.getTodayDateStr();
+                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                
+                if(emps.length === 0) return this.showModal('Notice', 'No employees exist to print for this project.');
+
+                // Helper to get log for an employee
+                const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0, cost_code_used: '' };
+
+                // Check for incomplete data
+                let incompleteCount = 0;
+                const noLogEmps = [];
+                emps.forEach(emp => {
+                    const log = getLog(emp.id);
+                    if ((log.am_in && !log.am_out) || (log.pm_in && !log.pm_out)) {
+                        incompleteCount++;
+                    }
+                    if (!log.am_in && !log.pm_in && !log.am_out && !log.pm_out) {
+                        noLogEmps.push(emp);
+                    }
+                });
+
+                let warningMsg = '';
+                if (incompleteCount > 0) {
+                    warningMsg = `<div class="p-3 bg-amber-50 text-amber-800 rounded border border-amber-200 mb-4 text-sm"><strong>Warning:</strong> ${incompleteCount} employee(s) have incomplete time logs (Missing OUT time).</div>`;
+                }
+
+                let absentHtml = '';
+                if (noLogEmps.length > 0) {
+                    absentHtml = `
+                        <div class="mt-4">
+                            <p class="text-sm font-semibold text-slate-800 mb-2">The following employees have no time logs today. Mark as ABSENT?</p>
+                            <div class="max-h-40 overflow-y-auto border border-slate-200 rounded p-2 bg-slate-50">
+                                ${noLogEmps.map(emp => `
+                                    <label class="flex items-center space-x-2 mb-1 cursor-pointer">
+                                        <input type="checkbox" class="absent-checkbox rounded border-slate-300 text-blue-600" value="${emp.id}" checked>
+                                        <span class="text-sm text-slate-700">${emp.name} (${emp.emp_id})</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const msgHtml = `
+                    ${warningMsg}
+                    <p class="text-sm text-slate-700">Are you sure you want to generate the timesheet for <strong>${proj.name}</strong> on <strong>${todayStr}</strong>?</p>
+                    <p class="text-sm text-slate-700 mt-2">This will automatically save and mark these records as <strong>Approved</strong>.</p>
+                    ${absentHtml}
+                `;
+
+                this.showFormModal('Generate & Approve Timesheet', msgHtml, async () => {
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...`;
+                    submitBtn.disabled = true;
+
+                    const absentIds = Array.from(document.querySelectorAll('.absent-checkbox:checked')).map(cb => cb.value);
+
+                    try {
+                        const batch = writeBatch(db);
+                        emps.forEach(emp => {
+                            const logId = `${emp.id}_${todayStr}`;
+                            const logRef = docPath('timesheets', logId);
+                            const log = getLog(emp.id);
+                            batch.set(logRef, {
+                                project_id: proj.id,
+                                emp_id: emp.id,
+                                date: todayStr,
+                                am_in: log.am_in || '',
+                                am_out: log.am_out || '',
+                                pm_in: log.pm_in || '',
+                                pm_out: log.pm_out || '',
+                                total_hrs: log.total_hrs || 0,
+                                cost_code_used: log.cost_code_used || emp.cost_code_1 || '',
+                                approved: true
+                            }, {merge: true});
+                        });
+                        await batch.commit();
+                        this.hideModal();
+                        this.showToast('Timesheets approved and saved.');
+                        this.fetchData(); // Refresh to get approved status
+                        
+                        // Proceed to print
+                        this.executePrint(proj, emps, todayStr, absentIds);
+                    } catch(e) {
+                        console.error(e);
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to approve timesheets.');
+                    }
+                });
+            },
+
+            executePrint(proj, emps, todayStr, absentIds = []) {
                 const pa = document.getElementById('print-area');
                 pa.innerHTML = '';
                 
@@ -1293,9 +1538,6 @@
                 const compAddr = this.companySettings.address || 'Company Address Not Set';
                 const compLogo = this.companySettings.logo_url;
 
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
-                
-                // Helper to get log for an employee
                 const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0, cost_code_used: '' };
 
                 let finalPagesHTML = '';
@@ -1308,9 +1550,9 @@
                     const catEmps = regularEmps.filter(e => (e.job_category || 'UNASSIGNED') === cat);
                     const chunks = this.chunkArray(catEmps, 30);
                     chunks.forEach(chunk => {
-                        let rows = `<tr><td colspan="12" class="job-category-row">${cat} - Regular</td></tr>`;
+                        let rows = `<tr><td colspan="10" class="job-category-row">${cat}</td></tr>`;
                         chunk.forEach((emp, idx) => {
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id));
+                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
                         });
                         finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
                     });
@@ -1327,9 +1569,9 @@
                             const empCat = emp.job_category || 'UNASSIGNED';
                             if(empCat !== currentCat) {
                                 currentCat = empCat;
-                                rows += `<tr><td colspan="12" class="job-category-row">${currentCat} - Local</td></tr>`;
+                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
                             }
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id));
+                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
                         });
                         finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
                     });
@@ -1346,9 +1588,9 @@
                             const empCat = emp.job_category || 'UNASSIGNED';
                             if(empCat !== currentCat) {
                                 currentCat = empCat;
-                                rows += `<tr><td colspan="12" class="job-category-row">${currentCat} - Other Location</td></tr>`;
+                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
                             }
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id));
+                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
                         });
                         finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
                     });
@@ -1420,7 +1662,7 @@
                 document.getElementById('pagination-info').innerText = `Page ${this.currentPage} of ${totalPages} (Showing ${paginatedRecords.length} records across ${currentDates.length} day/s)`;
 
                 if(paginatedRecords.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-12 text-center text-slate-500">No records found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No records found.</span></div></td></tr>`;
                     return;
                 }
 
@@ -1498,11 +1740,21 @@
                 this.showFormModal("Change Password", `<div><label class="block text-sm font-medium mb-1">New Password</label><input type="password" id="pass-new" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"></div>`, async () => {
                     const newP = document.getElementById('pass-new').value;
                     if(!newP) return this.showModal("Error", "Password cannot be empty.");
+
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Updating...`;
+                    submitBtn.disabled = true;
+
                     try {
                         await updateDoc(docPath('users', this.profile.username), { password: newP });
                         this.profile.password = newP;
                         this.hideModal(); this.showModal("Success", "Your password has been securely updated in the database.");
-                    } catch (e) { this.showModal("Database Error", "Failed to update password."); }
+                    } catch (e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal("Database Error", "Failed to update password."); 
+                    }
                 });
             },
 
@@ -1511,6 +1763,12 @@
                 const tbody = document.getElementById('users-body');
                 if(!tbody) return;
                 tbody.innerHTML = '';
+                
+                if(this.users.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg><span>No users found.</span></div></td></tr>`;
+                    return;
+                }
+
                 this.users.forEach(u => {
                     let assignedNames = 'All (Admin)';
                     if (u.role === 'pm') {
@@ -1588,21 +1846,41 @@
                     if(!un || !name) return this.showModal('Error', 'Username and Name are required.');
                     if(!username && !pass) return this.showModal('Error', 'Password is required for new users.');
 
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                    submitBtn.disabled = true;
+
                     try {
                         const data = { username: un, name, role, assigned_projects, has_demo_access };
                         if (pass) data.password = pass; // Only update password if provided
                         await setDoc(docPath('users', un), data, { merge: true });
                         this.hideModal();
-                    } catch(e) { this.showModal('Error','Failed to save user.'); }
+                        this.showToast('User saved successfully.');
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error','Failed to save user.'); 
+                    }
                 });
             },
 
             deleteUser(username) {
                 this.showFormModal('Confirm Deletion', `Are you sure you want to delete user <strong>${username}</strong>?`, async () => {
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Deleting...`;
+                    submitBtn.disabled = true;
+
                     try {
                         await deleteDoc(docPath('users', username));
                         this.hideModal();
-                    } catch(e) { this.showModal('Error', 'Failed to delete user.'); }
+                        this.showToast('User deleted successfully.');
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to delete user.'); 
+                    }
                 });
             },
 
@@ -1623,10 +1901,22 @@
             async saveCompanySettings() {
                 const name = document.getElementById('settings-company-name').value.trim();
                 const address = document.getElementById('settings-company-address').value.trim();
+                
+                const btn = document.querySelector('button[onclick="app.saveCompanySettings()"]');
+                const origText = btn.innerHTML;
+                btn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                btn.disabled = true;
+
                 try {
                     await setDoc(docPath('settings', 'company'), { name: name, address: address, logo_url: this.companySettings.logo_url || '' }, {merge: true});
-                    this.showModal('Success', 'Global company settings updated successfully.');
-                } catch(e) { this.showModal('Error', 'Failed to save settings.'); }
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                    this.showToast('Global company settings updated successfully.');
+                } catch(e) { 
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                    this.showModal('Error', 'Failed to save settings.'); 
+                }
             },
 
             // --- GUAM TIME ENGINE ---
