@@ -147,7 +147,8 @@
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> GPS Location Verified
                             </p>
                         </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <button onclick="app.activeProjectId = null; app.switchTab('pm-roster');" class="bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-bold hover:bg-slate-200 transition text-sm">Change Project</button>
                             <button onclick="app.bulkAction('AM_IN')" class="bg-blue-100 text-blue-800 border border-blue-200 px-4 py-2 rounded-lg font-bold hover:bg-blue-200 transition text-sm">Bulk AM IN</button>
                             <button onclick="app.bulkAction('AM_OUT')" class="bg-orange-100 text-orange-800 border border-orange-200 px-4 py-2 rounded-lg font-bold hover:bg-orange-200 transition text-sm">Bulk AM OUT</button>
                             <button onclick="app.bulkAction('PM_IN')" class="bg-blue-100 text-blue-800 border border-blue-200 px-4 py-2 rounded-lg font-bold hover:bg-blue-200 transition text-sm">Bulk PM IN</button>
@@ -188,36 +189,43 @@
 
             <!-- PM: REVIEW & EDIT TIMESHEETS -->
             <div id="tab-content-pm-timesheet" class="hidden space-y-6 fade-in">
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-800">Today's Timesheet Records</h2>
-                        <p class="text-sm text-slate-500">Review, adjust specific times, assign cost codes, and print DTR.</p>
+                <div id="timesheet-locked-view" class="hidden flex-col space-y-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800">Today's Timesheet Records</h2>
+                            <p class="text-sm text-slate-500">Review, adjust specific times, assign cost codes, and print DTR.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="app.activeProjectId = null; app.switchTab('pm-timesheet');" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition flex items-center shadow-sm border border-slate-300">
+                                Change Project
+                            </button>
+                            <button id="btn-print-dtr" class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                Print Daily Time Record
+                            </button>
+                        </div>
                     </div>
-                    <button id="btn-print-dtr" class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        Print Daily Time Record
-                    </button>
-                </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                        <table class="w-full text-sm text-left whitespace-nowrap">
-                            <thead class="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 border-b border-slate-200 z-10">
-                                <tr>
-                                    <th class="px-4 py-3">Emp ID</th>
-                                    <th class="px-4 py-3">Name</th>
-                                    <th class="px-4 py-3">AM IN</th>
-                                    <th class="px-4 py-3">AM OUT</th>
-                                    <th class="px-4 py-3">PM IN</th>
-                                    <th class="px-4 py-3">PM OUT</th>
-                                    <th class="px-4 py-3">Cost Code Used</th>
-                                    <th class="px-4 py-3 w-20">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="timesheet-edit-body" class="divide-y divide-slate-200">
-                                <!-- Populated via JS -->
-                            </tbody>
-                        </table>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                            <table class="w-full text-sm text-left whitespace-nowrap">
+                                <thead class="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 border-b border-slate-200 z-10">
+                                    <tr>
+                                        <th class="px-4 py-3">Emp ID</th>
+                                        <th class="px-4 py-3">Name</th>
+                                        <th class="px-4 py-3">AM IN</th>
+                                        <th class="px-4 py-3">AM OUT</th>
+                                        <th class="px-4 py-3">PM IN</th>
+                                        <th class="px-4 py-3">PM OUT</th>
+                                        <th class="px-4 py-3">Cost Code Used</th>
+                                        <th class="px-4 py-3 w-20">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timesheet-edit-body" class="divide-y divide-slate-200">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -243,9 +251,15 @@
                             <h3 class="font-bold text-blue-800">Employee Masterlist</h3>
                             <p class="text-xs text-blue-600 mt-1">Manage project assignments, types, and cost codes.</p>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2 justify-end">
+                            <button onclick="app.exportAdminRoster()" class="bg-emerald-600 text-white px-3 py-1.5 rounded shadow-sm hover:bg-emerald-700 transition text-sm flex items-center font-medium">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export List
+                            </button>
                             <button onclick="document.getElementById('excel-file-input').click()" class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded shadow-sm hover:bg-slate-50 transition text-sm flex items-center font-medium">
                                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Excel/CSV
+                            </button>
+                            <button onclick="app.deleteSelectedEmployees()" class="bg-rose-600 text-white px-3 py-1.5 rounded shadow-sm hover:bg-rose-700 transition text-sm flex items-center font-medium hidden" id="btn-delete-selected-emps">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Delete Selected
                             </button>
                             <button onclick="app.editEmployee(null)" class="bg-blue-600 text-white px-3 py-1.5 rounded shadow-sm hover:bg-blue-700 transition text-sm flex items-center font-medium">
                                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add Employee
@@ -261,6 +275,7 @@
                         <table class="w-full text-sm text-left whitespace-nowrap">
                             <thead class="text-xs text-slate-500 uppercase bg-white sticky top-0 border-b border-slate-200 z-10 shadow-sm">
                                 <tr>
+                                    <th class="px-4 py-3 w-10 text-center"><input type="checkbox" id="admin-roster-select-all" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" onchange="app.toggleAllAdminRoster(this.checked)"></th>
                                     <th class="px-4 py-3">Project</th>
                                     <th class="px-4 py-3">Emp ID</th>
                                     <th class="px-4 py-3">Name</th>
@@ -683,11 +698,12 @@
                 document.getElementById('dash-user-name').innerText = this.profile.name;
                 document.getElementById('nav-user-role').innerText = this.profile.role;
 
-                const tabs = ['pm-roster', 'pm-timesheet'];
+                let tabs = [];
                 if(this.profile.role === 'admin') {
-                    tabs.push('admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo');
-                } else if (this.profile.role === 'pm' && this.profile.has_demo_access) {
-                    tabs.push('admin-demo');
+                    tabs = ['pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
+                } else {
+                    tabs = ['pm-roster', 'pm-timesheet'];
+                    if (this.profile.has_demo_access) tabs.push('admin-demo');
                 }
 
                 document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => btn.classList.add('hidden'));
@@ -696,9 +712,9 @@
                     if(btn) btn.classList.remove('hidden');
                 });
 
-                if(this.profile.role === 'admin') this.switchTab('admin-roster');
-                else {
-                    document.getElementById('pm-project-selector').classList.replace('hidden', 'flex');
+                if(this.profile.role === 'admin') {
+                    this.switchTab('admin-roster');
+                } else {
                     this.switchTab('pm-roster');
                 }
             },
@@ -711,6 +727,25 @@
                 const btn = document.getElementById(`tab-btn-${tabId}`);
                 if(content) content.classList.remove('hidden');
                 if(btn) btn.className = btn.className.replace('tab-inactive', 'tab-active');
+
+                const projSelector = document.getElementById('pm-project-selector');
+                if (tabId === 'pm-roster' || tabId === 'pm-timesheet') {
+                    if (!this.activeProjectId) {
+                        projSelector.classList.replace('hidden', 'flex');
+                        const rLocked = document.getElementById('roster-locked-view');
+                        if (rLocked) rLocked.classList.replace('flex', 'hidden');
+                        const tLocked = document.getElementById('timesheet-locked-view');
+                        if (tLocked) tLocked.classList.replace('flex', 'hidden');
+                    } else {
+                        projSelector.classList.replace('flex', 'hidden');
+                        const rLocked = document.getElementById('roster-locked-view');
+                        if (rLocked) rLocked.classList.replace('hidden', 'flex');
+                        const tLocked = document.getElementById('timesheet-locked-view');
+                        if (tLocked) tLocked.classList.replace('hidden', 'flex');
+                    }
+                } else {
+                    projSelector.classList.replace('flex', 'hidden');
+                }
             },
 
             // --- PROJECT SELECTION & GPS ---
@@ -741,13 +776,24 @@
                 const proj = this.projects.find(p => p.id === pid);
                 if(!proj) return this.showModal('Error', 'Project not found.');
 
-                // IF COORDINATES ARE MISSING -> BYPASS GPS
-                if(!proj.lat || !proj.lng) {
+                // IF COORDINATES ARE MISSING OR USER IS ADMIN -> BYPASS GPS
+                if(!proj.lat || !proj.lng || this.profile.role === 'admin') {
                     this.activeProjectId = pid;
                     document.getElementById('modal-container').classList.add('hidden');
                     document.getElementById('pm-project-selector').classList.replace('flex', 'hidden');
-                    document.getElementById('roster-locked-view').classList.replace('hidden', 'flex');
-                    document.getElementById('roster-project-name').innerHTML = `${proj.name} <span class="text-xs text-slate-500 ml-2 font-normal">(No GPS Required)</span>`;
+                    
+                    const rosterLocked = document.getElementById('roster-locked-view');
+                    if (rosterLocked) {
+                        rosterLocked.classList.replace('hidden', 'flex');
+                        const rName = document.getElementById('roster-project-name');
+                        if (rName) rName.innerHTML = `${proj.name} <span class="text-xs text-slate-500 ml-2 font-normal">(${this.profile.role === 'admin' ? 'Admin Override' : 'No GPS Required'})</span>`;
+                    }
+                    
+                    const timesheetLocked = document.getElementById('timesheet-locked-view');
+                    if (timesheetLocked) {
+                        timesheetLocked.classList.replace('hidden', 'flex');
+                    }
+
                     this.renderRoster();
                     this.renderTimesheetEdit();
                     return;
@@ -772,8 +818,19 @@
                             this.activeProjectId = pid;
                             document.getElementById('modal-container').classList.add('hidden');
                             document.getElementById('pm-project-selector').classList.replace('flex', 'hidden');
-                            document.getElementById('roster-locked-view').classList.replace('hidden', 'flex');
-                            document.getElementById('roster-project-name').innerText = proj.name;
+                            
+                            const rosterLocked = document.getElementById('roster-locked-view');
+                            if (rosterLocked) {
+                                rosterLocked.classList.replace('hidden', 'flex');
+                                const rName = document.getElementById('roster-project-name');
+                                if (rName) rName.innerText = proj.name;
+                            }
+                            
+                            const timesheetLocked = document.getElementById('timesheet-locked-view');
+                            if (timesheetLocked) {
+                                timesheetLocked.classList.replace('hidden', 'flex');
+                            }
+
                             this.renderRoster();
                             this.renderTimesheetEdit();
                             this.showToast('GPS Location Verified.');
@@ -1144,7 +1201,8 @@
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
                 if(emps.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found.</span></div></td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found.</span></div></td></tr>`;
+                    this.updateAdminRosterSelection();
                     return;
                 }
 
@@ -1152,6 +1210,7 @@
                     const proj = this.projects.find(p => p.id === e.project_id);
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 transition border-b">
+                            <td class="px-4 py-3 text-center"><input type="checkbox" class="admin-roster-chk w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" value="${e.id}" onchange="app.updateAdminRosterSelection()"></td>
                             <td class="px-4 py-3 text-slate-700 max-w-[150px] truncate">${proj ? proj.name : 'Unknown Project'}</td>
                             <td class="px-4 py-3 font-medium">${e.emp_id}</td>
                             <td class="px-4 py-3 font-semibold text-slate-800">${e.name}</td>
@@ -1165,6 +1224,94 @@
                         </tr>
                     `;
                 });
+                
+                this.updateAdminRosterSelection();
+            },
+
+            toggleAllAdminRoster(checked) {
+                document.querySelectorAll('.admin-roster-chk').forEach(chk => chk.checked = checked);
+                this.updateAdminRosterSelection();
+            },
+
+            updateAdminRosterSelection() {
+                const checked = document.querySelectorAll('.admin-roster-chk:checked');
+                const btnDelete = document.getElementById('btn-delete-selected-emps');
+                const selectAll = document.getElementById('admin-roster-select-all');
+                const allChks = document.querySelectorAll('.admin-roster-chk');
+                
+                if (btnDelete) {
+                    if (checked.length > 0) {
+                        btnDelete.classList.remove('hidden');
+                        btnDelete.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Delete Selected (${checked.length})`;
+                    } else {
+                        btnDelete.classList.add('hidden');
+                    }
+                }
+                
+                if (selectAll) {
+                    selectAll.checked = allChks.length > 0 && checked.length === allChks.length;
+                }
+            },
+
+            deleteSelectedEmployees() {
+                const checked = Array.from(document.querySelectorAll('.admin-roster-chk:checked')).map(c => c.value);
+                if (checked.length === 0) return;
+                
+                this.showFormModal('Confirm Bulk Deletion', `Are you sure you want to delete <strong>${checked.length}</strong> selected employees? This action cannot be undone.`, async () => {
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Deleting...`;
+                    submitBtn.disabled = true;
+
+                    try {
+                        const chunks = this.chunkArray(checked, 400);
+                        for (const chunk of chunks) {
+                            const batch = writeBatch(db);
+                            chunk.forEach(id => {
+                                batch.delete(docPath('employees', id));
+                            });
+                            await batch.commit();
+                        }
+                        
+                        this.hideModal();
+                        this.showToast(`Successfully deleted ${checked.length} employees.`);
+                    } catch(e) { 
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to delete selected employees.'); 
+                    }
+                });
+            },
+
+            exportAdminRoster() {
+                const filterPid = document.getElementById('admin-roster-project-filter')?.value;
+                let emps = this.employees;
+                if(filterPid) emps = emps.filter(e => e.project_id === filterPid);
+
+                if (emps.length === 0) {
+                    return this.showModal('Notice', 'No employees to export.');
+                }
+
+                emps.sort((a,b) => a.name.localeCompare(b.name));
+
+                let csv = 'Project,Emp ID,Name,Category,Type,Cost Code 1,Cost Code 2\n';
+                emps.forEach(e => {
+                    const proj = this.projects.find(p => p.id === e.project_id);
+                    const pName = proj ? proj.name.replace(/"/g, '""') : 'Unknown';
+                    const name = e.name ? e.name.replace(/"/g, '""') : '';
+                    const cat = e.job_category ? e.job_category.replace(/"/g, '""') : '';
+                    
+                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}"\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `employee_masterlist_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             },
 
             editEmployee(id) {
