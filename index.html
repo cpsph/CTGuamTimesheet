@@ -110,6 +110,7 @@
                     <!-- PM Tabs -->
                     <button id="tab-btn-pm-roster" class="tab-inactive px-4 py-2 text-sm font-medium rounded-md transition hidden">Daily Bulk Logging</button>
                     <button id="tab-btn-pm-timesheet" class="tab-inactive px-4 py-2 text-sm font-medium rounded-md transition hidden">Review & Edit Timesheets</button>
+                    <button id="tab-btn-pm-submissions" class="tab-inactive px-4 py-2 text-sm font-medium rounded-md transition hidden">Submission Status</button>
                     
                     <!-- Admin Tabs -->
                     <button id="tab-btn-admin-projects" class="tab-inactive px-4 py-2 text-sm font-medium rounded-md transition hidden">Manage Projects</button>
@@ -216,6 +217,10 @@
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 Print Daily Time Record
                             </button>
+                            <button id="btn-submit-timesheet" onclick="app.submitDailyTimesheet()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition flex items-center shadow-sm hidden">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Submit for Approval
+                            </button>
                         </div>
                     </div>
 
@@ -240,6 +245,42 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PM: SUBMISSIONS -->
+            <div id="tab-content-pm-submissions" class="hidden space-y-6 fade-in">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-indigo-50 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-indigo-900">Timesheet Submissions</h3>
+                            <p class="text-sm text-indigo-700">Manage and track the status of timesheet submissions.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="submission-status-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" onchange="app.renderSubmissions()">
+                                <option value="all">All Statuses</option>
+                                <option value="pending">Pending Approval</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left whitespace-nowrap">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-100 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-3">Date</th>
+                                    <th class="px-6 py-3">Project</th>
+                                    <th class="px-6 py-3">Submitted By</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="submissions-body" class="divide-y divide-slate-200">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -328,13 +369,15 @@
                                 <button class="bg-slate-800 text-white px-4 py-1.5 rounded shadow-sm hover:bg-slate-900 transition flex items-center font-medium">
                                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export
                                 </button>
-                                <div class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
-                                    <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">CSV Format</div>
-                                    <button onclick="app.exportData(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
-                                    <button onclick="app.exportData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 border-b">Export Rounded (15m)</button>
-                                    <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">IIF Format (QuickBooks)</div>
-                                    <button onclick="app.exportIIF(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
-                                    <button onclick="app.exportIIF(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
+                                <div class="absolute right-0 top-full pt-1 w-56 z-50 hidden group-hover:block">
+                                    <div class="bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                        <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">CSV Format</div>
+                                        <button onclick="app.exportData(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
+                                        <button onclick="app.exportData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 border-b">Export Rounded (15m)</button>
+                                        <div class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b uppercase">IIF Format (QuickBooks)</div>
+                                        <button onclick="app.exportIIF(false)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Exact Times</button>
+                                        <button onclick="app.exportIIF(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -476,6 +519,21 @@
                                 <button id="btn-demo-add-1d" class="bg-purple-100 text-purple-700 border border-purple-200 px-4 py-2 rounded-lg font-medium hover:bg-purple-200 transition shadow-sm">+ 1 Day (24 hrs)</button>
                             </div>
                         </div>
+
+                        <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-700 mb-4">Demo Access Permissions</h4>
+                            <p class="text-sm text-slate-500 mb-4">Allow other user roles to access the Demo tab and manipulate time.</p>
+                            <div class="flex flex-col gap-3">
+                                <label class="flex items-center space-x-3 cursor-pointer">
+                                    <input type="checkbox" id="toggle-demo-pm" class="w-5 h-5 text-amber-600 rounded border-slate-300 focus:ring-amber-500" onchange="app.updateDemoPermissions('pm', this.checked)">
+                                    <span class="font-medium text-slate-700">Grant Demo Access to Project Managers</span>
+                                </label>
+                                <label class="flex items-center space-x-3 cursor-pointer">
+                                    <input type="checkbox" id="toggle-demo-tk" class="w-5 h-5 text-amber-600 rounded border-slate-300 focus:ring-amber-500" onchange="app.updateDemoPermissions('tk', this.checked)">
+                                    <span class="font-medium text-slate-700">Grant Demo Access to Timekeepers</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -536,12 +594,13 @@
             projects: [],
             employees: [],
             timesheets: [],
+            submissions: [],
             activeProjectId: null,
             unsubs: [],
             
             timeOffset: 0,
             demoOffset: 0,
-            companySettings: { name: 'PHC CORPORATION', address: '', logo_url: '' },
+            companySettings: { name: 'PHC CORPORATION', address: '', logo_url: '', demoPermissions: { pm: false, tk: false } },
             currentPage: 1,
             daysPerPage: 10,
 
@@ -667,12 +726,22 @@
                 this.unsubs.push(onSnapshot(docPath('settings', 'company'), snap => {
                     if(snap.exists()) {
                         this.companySettings = snap.data();
+                        if (!this.companySettings.demoPermissions) {
+                            this.companySettings.demoPermissions = { pm: false, tk: false };
+                        }
                         const nameEl = document.getElementById('settings-company-name');
                         const addrEl = document.getElementById('settings-company-address');
                         const logoEl = document.getElementById('settings-logo-preview');
                         if(nameEl) nameEl.value = this.companySettings.name || 'PHC CORPORATION';
                         if(addrEl) addrEl.value = this.companySettings.address || '';
                         if(logoEl && this.companySettings.logo_url) logoEl.innerHTML = `<img src="${this.companySettings.logo_url}" class="max-w-full max-h-full object-contain">`;
+                        
+                        const togglePm = document.getElementById('toggle-demo-pm');
+                        const toggleTk = document.getElementById('toggle-demo-tk');
+                        if (togglePm) togglePm.checked = this.companySettings.demoPermissions.pm;
+                        if (toggleTk) toggleTk.checked = this.companySettings.demoPermissions.tk;
+                        
+                        this.updateNavVisibility();
                     }
                 }));
 
@@ -695,6 +764,11 @@
                     }
                     if(this.profile.role === 'admin') this.renderAllRecordsTable();
                 }));
+                this.unsubs.push(onSnapshot(collPath('submissions'), snap => {
+                    this.submissions = []; snap.forEach(d => this.submissions.push({id: d.id, ...d.data()}));
+                    this.renderSubmissions();
+                    this.renderTimesheetEdit(); // Re-render to update submit button visibility
+                }));
                 if(this.profile.role === 'admin') {
                     this.unsubs.push(onSnapshot(collPath('users'), snap => {
                         this.users = []; snap.forEach(d => this.users.push({id: d.id, ...d.data()}));
@@ -716,24 +790,52 @@
                 document.getElementById('dash-user-name').innerText = this.profile.name;
                 document.getElementById('nav-user-role').innerText = this.profile.role;
 
+                this.updateNavVisibility();
+
+                if(this.profile.role === 'admin') {
+                    this.switchTab('admin-roster');
+                } else if (this.profile.role === 'tk') {
+                    this.switchTab('pm-roster');
+                } else {
+                    this.switchTab('pm-timesheet');
+                }
+            },
+
+            updateNavVisibility() {
+                if (!this.profile) return;
+                
                 let tabs = [];
                 if(this.profile.role === 'admin') {
-                    tabs = ['pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
-                } else {
-                    tabs = ['pm-roster', 'pm-timesheet'];
-                    if (this.profile.has_demo_access) tabs.push('admin-demo');
+                    tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
+                } else if (this.profile.role === 'tk') {
+                    tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions'];
+                    if (this.companySettings?.demoPermissions?.tk) tabs.push('admin-demo');
+                } else if (this.profile.role === 'pm') {
+                    tabs = ['pm-timesheet', 'pm-submissions'];
+                    if (this.companySettings?.demoPermissions?.pm) tabs.push('admin-demo');
                 }
 
-                document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => btn.classList.add('hidden'));
+                document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
+                    if (btn.id === 'tab-btn-logout') return;
+                    btn.classList.add('hidden');
+                });
+                
                 tabs.forEach(t => {
                     const btn = document.getElementById(`tab-btn-${t}`);
                     if(btn) btn.classList.remove('hidden');
                 });
+            },
 
-                if(this.profile.role === 'admin') {
-                    this.switchTab('admin-roster');
-                } else {
-                    this.switchTab('pm-roster');
+            async updateDemoPermissions(role, isChecked) {
+                if (this.profile.role !== 'admin') return;
+                try {
+                    const currentPerms = this.companySettings.demoPermissions || { pm: false, tk: false };
+                    currentPerms[role] = isChecked;
+                    await setDoc(docPath('settings', 'company'), { demoPermissions: currentPerms }, { merge: true });
+                    this.showToast(`Demo access for ${role.toUpperCase()} updated.`);
+                } catch (e) {
+                    console.error("Failed to update permissions", e);
+                    this.showToast("Failed to update permissions.", "error");
                 }
             },
 
@@ -766,6 +868,14 @@
                     }
                 } else {
                     projSelector.classList.replace('flex', 'hidden');
+                }
+
+                if (tabId === 'admin-demo') {
+                    const now = this.getRealTime();
+                    const dFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Guam', year: 'numeric', month: '2-digit', day: '2-digit' });
+                    const tFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Guam', hour: '2-digit', minute: '2-digit', hour12: false });
+                    document.getElementById('demo-date').value = dFormatter.format(now);
+                    document.getElementById('demo-time').value = tFormatter.format(now);
                 }
             },
 
@@ -961,6 +1071,12 @@
             bulkAction(type) {
                 if(!this.activeProjectId) return;
                 
+                const targetDateStr = this.getTimesheetDateStr();
+                const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
+                if (existingSubmission && existingSubmission.status !== 'rejected') {
+                    return this.showModal('Notice', 'Timesheet for this date has already been submitted and is locked.');
+                }
+                
                 const typeLabels = { 'AM_IN': 'AM IN', 'AM_OUT': 'AM OUT', 'PM_IN': 'PM IN', 'PM_OUT': 'PM OUT' };
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
                 
@@ -985,24 +1101,35 @@
                                 </div>
                             </div>
                             <select class="modal-roster-leave text-xs border border-slate-300 rounded px-2 py-1 outline-none ${isChecked ? 'hidden' : ''}" data-emp="${emp.id}">
-                                <option value="">-- No Leave (Just Late) --</option>
-                                <option value="Absent">Absent (No Pay)</option>
-                                <option value="Leave">Leave</option>
-                                <option value="Sick">Sick</option>
-                                <option value="Maternity">Maternity</option>
-                                <option value="Paternity">Paternity</option>
-                                <option value="Bereavement">Bereavement</option>
+                                <option value="">Just Late/Waiting</option>
+                                <option value="Absent">Absent</option>
+                                <option value="Vacation Leave">Vacation Leave</option>
+                                <option value="Sick Leave">Sick Leave</option>
+                                <option value="Maternity Leave">Maternity Leave</option>
+                                <option value="Paternity Leave">Paternity Leave</option>
+                                <option value="Bereavement Leave">Bereavement Leave</option>
                             </select>
                         </label>
                     `;
                 });
                 empListHtml += `</div>`;
 
+                let pmOutTimeHtml = '';
+                if (type === 'PM_OUT') {
+                    pmOutTimeHtml = `
+                        <div class="mb-4 p-3 bg-slate-100 rounded border border-slate-300 flex items-center justify-between">
+                            <label class="text-sm font-bold text-slate-700">Set PM OUT Time (Guam Time):</label>
+                            <input type="time" id="modal-pm-out-time" value="16:00" class="border border-slate-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    `;
+                }
+
                 const formHtml = `
                     <div class="mb-2">
                         <div class="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-200 mb-4 text-sm">
                             You are about to log <strong>${typeLabels[type]}</strong>. Please explicitly uncheck any employee who is absent or not yet on site before confirming.
                         </div>
+                        ${pmOutTimeHtml}
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 px-2">
                             <label class="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer">
                                 <input type="checkbox" id="modal-check-all" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" ${preCheckedCount === emps.length ? 'checked' : ''}>
@@ -1071,7 +1198,14 @@
                 }
 
                 const todayStr = this.getTodayDateStr();
-                const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
+                let nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
+
+                if (type === 'PM_OUT') {
+                    const timeInput = document.getElementById('modal-pm-out-time');
+                    if (timeInput && timeInput.value) {
+                        nowTime = timeInput.value;
+                    }
+                }
 
                 const submitBtn = document.getElementById('btn-modal-confirm');
                 const origText = submitBtn.innerText;
@@ -1166,6 +1300,18 @@
 
                 const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
                 
+                const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
+                const isSubmitted = existingSubmission && existingSubmission.status !== 'rejected';
+                
+                const submitBtn = document.getElementById('btn-submit-timesheet');
+                if (submitBtn) {
+                    if (this.profile.role === 'tk' && !isSubmitted) {
+                        submitBtn.classList.remove('hidden');
+                    } else {
+                        submitBtn.classList.add('hidden');
+                    }
+                }
+
                 if(emps.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
                     return;
@@ -1176,6 +1322,16 @@
                     const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1, leave_type: '' };
 
                     const usedCc = log.cost_code_used || emp.cost_code_1 || '';
+                    
+                    let actionButtons = '';
+                    if (isSubmitted && this.profile.role === 'tk') {
+                        actionButtons = `<span class="text-xs text-amber-600 font-bold">LOCKED</span>`;
+                    } else {
+                        actionButtons = `
+                            <button onclick="app.toggleEditRow('${emp.id}', '${docId}')" class="btn-toggle-edit bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded text-xs font-bold border border-slate-300">EDIT</button>
+                            <button onclick="app.saveSingleLog('${emp.id}', '${docId}')" class="btn-save-edit hidden bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">SAVE</button>
+                        `;
+                    }
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
@@ -1185,11 +1341,11 @@
                                 <select class="edit-leave border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>
                                     <option value="" ${!log.leave_type ? 'selected' : ''}>Present</option>
                                     <option value="Absent" ${log.leave_type === 'Absent' ? 'selected' : ''}>Absent</option>
-                                    <option value="Leave" ${log.leave_type === 'Leave' ? 'selected' : ''}>Leave</option>
-                                    <option value="Sick" ${log.leave_type === 'Sick' ? 'selected' : ''}>Sick</option>
-                                    <option value="Maternity" ${log.leave_type === 'Maternity' ? 'selected' : ''}>Maternity</option>
-                                    <option value="Paternity" ${log.leave_type === 'Paternity' ? 'selected' : ''}>Paternity</option>
-                                    <option value="Bereavement" ${log.leave_type === 'Bereavement' ? 'selected' : ''}>Bereavement</option>
+                                    <option value="Vacation Leave" ${log.leave_type === 'Vacation Leave' || log.leave_type === 'Leave' ? 'selected' : ''}>Vacation Leave</option>
+                                    <option value="Sick Leave" ${log.leave_type === 'Sick Leave' || log.leave_type === 'Sick' ? 'selected' : ''}>Sick Leave</option>
+                                    <option value="Maternity Leave" ${log.leave_type === 'Maternity Leave' || log.leave_type === 'Maternity' ? 'selected' : ''}>Maternity Leave</option>
+                                    <option value="Paternity Leave" ${log.leave_type === 'Paternity Leave' || log.leave_type === 'Paternity' ? 'selected' : ''}>Paternity Leave</option>
+                                    <option value="Bereavement Leave" ${log.leave_type === 'Bereavement Leave' || log.leave_type === 'Bereavement' ? 'selected' : ''}>Bereavement Leave</option>
                                 </select>
                             </td>
                             <td class="px-4 py-2"><input type="time" class="edit-in border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_in}" disabled></td>
@@ -1198,8 +1354,7 @@
                             <td class="px-4 py-2"><input type="time" class="edit-out2 border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.pm_out}" disabled></td>
                             <td class="px-4 py-2"><input type="text" class="edit-cc border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent" value="${usedCc}" disabled></td>
                             <td class="px-4 py-2">
-                                <button onclick="app.toggleEditRow('${emp.id}', '${docId}')" class="btn-toggle-edit bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded text-xs font-bold border border-slate-300">EDIT</button>
-                                <button onclick="app.saveSingleLog('${emp.id}', '${docId}')" class="btn-save-edit hidden bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">SAVE</button>
+                                ${actionButtons}
                             </td>
                         </tr>
                     `;
@@ -1258,6 +1413,36 @@
                     btnSave.innerText = "SAVED!"; btnSave.classList.replace('text-indigo-700','text-green-700');
                     this.showToast('Timesheet record saved.');
                     
+                    if (cc_changed) {
+                        this.showFormModal('Update Employee Cost Code?', `
+                            <p class="mb-4">You have entered a new cost code (<strong>${cc}</strong>) for <strong>${emp.name}</strong>.</p>
+                            <p class="mb-4">Would you like to update their masterlist record with this new cost code?</p>
+                            <div class="flex gap-4">
+                                <label class="flex items-center space-x-2">
+                                    <input type="radio" name="cc_update_type" value="cc1" checked class="text-blue-600 focus:ring-blue-500">
+                                    <span>Set as Cost Code 1</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="radio" name="cc_update_type" value="cc2" class="text-blue-600 focus:ring-blue-500">
+                                    <span>Set as Cost Code 2</span>
+                                </label>
+                            </div>
+                        `, async () => {
+                            const updateType = document.querySelector('input[name="cc_update_type"]:checked').value;
+                            try {
+                                const updateData = {};
+                                if (updateType === 'cc1') updateData.cost_code_1 = cc;
+                                else updateData.cost_code_2 = cc;
+                                await setDoc(docPath('employees', empId), updateData, { merge: true });
+                                this.showToast('Employee masterlist updated.');
+                                this.hideModal();
+                            } catch (err) {
+                                console.error(err);
+                                this.showToast('Failed to update employee.', 'error');
+                            }
+                        });
+                    }
+
                     setTimeout(() => { 
                         btnSave.innerText = origText; 
                         btnSave.classList.replace('text-green-700','text-indigo-700'); 
@@ -1287,6 +1472,139 @@
                 let mins = (oh*60 + om) - (ih*60 + im);
                 if(mins < 0) mins += 24*60;
                 return Math.round((mins/60)*100)/100;
+            },
+
+            roundTime15m(timeStr) {
+                if (!timeStr) return '';
+                let [h, m] = timeStr.split(':').map(Number);
+                let roundedMins = Math.round(m / 15) * 15;
+                if (roundedMins === 60) {
+                    h = (h + 1) % 24;
+                    roundedMins = 0;
+                }
+                return `${h.toString().padStart(2, '0')}:${roundedMins.toString().padStart(2, '0')}`;
+            },
+
+            formatHoursToHHMM(decimalHours) {
+                if (!decimalHours) return '0:00';
+                const hours = Math.floor(decimalHours);
+                const minutes = Math.round((decimalHours - hours) * 60);
+                return `${hours}:${minutes.toString().padStart(2, '0')}`;
+            },
+
+            async submitDailyTimesheet() {
+                if (!this.activeProjectId) return;
+                const dateStr = this.getTimesheetDateStr();
+                const proj = this.projects.find(p => p.id === this.activeProjectId);
+                
+                const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === dateStr);
+                if (existingSubmission && existingSubmission.status !== 'rejected') {
+                    return this.showModal('Notice', 'This timesheet has already been submitted.');
+                }
+
+                this.showFormModal('Submit Timesheet', `
+                    <p class="mb-4">Are you sure you want to submit the timesheet for <strong>${proj?.name}</strong> on <strong>${dateStr}</strong>?</p>
+                    <p class="text-sm text-amber-600 font-medium">Once submitted, you will not be able to edit it unless it is rejected by a Project Manager.</p>
+                `, async () => {
+                    try {
+                        const subId = `${this.activeProjectId}_${dateStr}`;
+                        await setDoc(docPath('submissions', subId), {
+                            project_id: this.activeProjectId,
+                            date: dateStr,
+                            submitted_by: this.profile.username,
+                            submitter_name: this.profile.name,
+                            status: 'pending',
+                            created_at: Date.now()
+                        });
+                        this.showToast('Timesheet submitted successfully.');
+                        this.hideModal();
+                    } catch (e) {
+                        console.error(e);
+                        this.showToast('Failed to submit timesheet.', 'error');
+                    }
+                });
+            },
+
+            renderSubmissions() {
+                const tbody = document.getElementById('submissions-body');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                let filterStatus = document.getElementById('submission-status-filter')?.value || 'all';
+                
+                let subs = this.submissions;
+                if (this.profile.role === 'pm') {
+                    const assigned = this.profile.assigned_projects || [];
+                    subs = subs.filter(s => assigned.includes(s.project_id));
+                } else if (this.profile.role === 'tk') {
+                    subs = subs.filter(s => s.submitted_by === this.profile.username);
+                }
+
+                if (filterStatus !== 'all') {
+                    subs = subs.filter(s => s.status === filterStatus);
+                }
+
+                subs.sort((a, b) => b.created_at - a.created_at);
+
+                if (subs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No submissions found.</td></tr>`;
+                    return;
+                }
+
+                subs.forEach(s => {
+                    const proj = this.projects.find(p => p.id === s.project_id);
+                    const projName = proj ? proj.name : 'Unknown Project';
+                    
+                    let statusBadge = '';
+                    if (s.status === 'pending') statusBadge = '<span class="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">Pending</span>';
+                    else if (s.status === 'approved') statusBadge = '<span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">Approved</span>';
+                    else if (s.status === 'rejected') statusBadge = '<span class="px-2 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">Rejected</span>';
+
+                    let actions = '';
+                    if (this.profile.role === 'pm' && s.status === 'pending') {
+                        actions = `
+                            <button onclick="app.updateSubmissionStatus('${s.id}', 'approved')" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1 rounded text-xs font-bold mr-2">Approve</button>
+                            <button onclick="app.updateSubmissionStatus('${s.id}', 'rejected')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-3 py-1 rounded text-xs font-bold">Reject</button>
+                        `;
+                    } else if (this.profile.role === 'admin') {
+                        actions = `
+                            <button onclick="app.deleteSubmission('${s.id}')" class="bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded text-xs font-bold">Delete</button>
+                        `;
+                    } else {
+                        actions = '<span class="text-xs text-slate-400">No actions</span>';
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 border-b">
+                            <td class="px-6 py-4 font-medium">${s.date}</td>
+                            <td class="px-6 py-4">${projName}</td>
+                            <td class="px-6 py-4">${s.submitter_name || s.submitted_by}</td>
+                            <td class="px-6 py-4">${statusBadge}</td>
+                            <td class="px-6 py-4">${actions}</td>
+                        </tr>
+                    `;
+                });
+            },
+
+            async updateSubmissionStatus(subId, newStatus) {
+                try {
+                    await setDoc(docPath('submissions', subId), { status: newStatus }, { merge: true });
+                    this.showToast(`Submission marked as ${newStatus}.`);
+                } catch (e) {
+                    console.error(e);
+                    this.showToast('Failed to update status.', 'error');
+                }
+            },
+
+            async deleteSubmission(subId) {
+                if (!confirm('Are you sure you want to delete this submission record?')) return;
+                try {
+                    await deleteDoc(docPath('submissions', subId));
+                    this.showToast('Submission deleted.');
+                } catch (e) {
+                    console.error(e);
+                    this.showToast('Failed to delete.', 'error');
+                }
             },
 
             // --- ADMIN: MANAGE ROSTER ---
@@ -1395,14 +1713,14 @@
 
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
-                let csv = 'Project,Emp ID,Name,Category,Type,Cost Code 1,Cost Code 2\n';
+                let csv = 'Project,Emp ID,Name,Category,Type,Payroll Item,Cost Code 1,Cost Code 2,Rounding Class\n';
                 emps.forEach(e => {
                     const proj = this.projects.find(p => p.id === e.project_id);
                     const pName = proj ? proj.name.replace(/"/g, '""') : 'Unknown';
                     const name = e.name ? e.name.replace(/"/g, '""') : '';
                     const cat = e.job_category ? e.job_category.replace(/"/g, '""') : '';
                     
-                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}"\n`;
+                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.payroll_item || 'Hourly'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}","${e.rounding_class || 'Rounding'}"\n`;
                 });
 
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1416,7 +1734,7 @@
             },
 
             editEmployee(id) {
-                const emp = id ? this.employees.find(x => x.id === id) : { project_id: '', emp_id: '', name: '', job_category: '', type: 'Regular', cost_code_1: '', cost_code_2: '' };
+                const emp = id ? this.employees.find(x => x.id === id) : { project_id: '', emp_id: '', name: '', job_category: '', type: 'Regular', payroll_item: 'Hourly', cost_code_1: '', cost_code_2: '', rounding_class: 'Rounding' };
                 const projOptions = this.projects.map(p => `<option value="${p.id}" ${p.id===emp.project_id?'selected':''}>${p.name}</option>`).join('');
 
                 this.showFormModal(id ? 'Edit Employee Data' : 'Add New Employee', `
@@ -1446,6 +1764,22 @@
                             </select>
                         </div>
                         <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase">Rounding Class</label>
+                            <select id="fe-round" class="w-full px-3 py-2 border rounded outline-none mt-1">
+                                <option value="Rounding" ${emp.rounding_class==='Rounding'?'selected':''}>Rounding</option>
+                                <option value="Exact" ${emp.rounding_class==='Exact'?'selected':''}>Exact</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase">Payroll Item</label>
+                            <select id="fe-payroll" class="w-full px-3 py-2 border rounded outline-none mt-1">
+                                <option value="Hourly" ${emp.payroll_item==='Hourly'?'selected':''}>Hourly</option>
+                                <option value="Salary" ${emp.payroll_item==='Salary'?'selected':''}>Salary</option>
+                                <option value="Overtime" ${emp.payroll_item==='Overtime'?'selected':''}>Overtime</option>
+                                <option value="Sick Pay" ${emp.payroll_item==='Sick Pay'?'selected':''}>Sick Pay</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase">Primary Cost Code</label>
                             <input type="text" id="fe-cc1" value="${emp.cost_code_1}" class="w-full px-3 py-2 border rounded outline-none mt-1">
                         </div>
@@ -1472,6 +1806,8 @@
                             project_id: pId, emp_id: eId, name: name, 
                             job_category: document.getElementById('fe-cat').value.trim(),
                             type: document.getElementById('fe-type').value,
+                            rounding_class: document.getElementById('fe-round').value,
+                            payroll_item: document.getElementById('fe-payroll').value,
                             cost_code_1: document.getElementById('fe-cc1').value.trim(),
                             cost_code_2: document.getElementById('fe-cc2').value.trim()
                         }, {merge:true});
@@ -1612,8 +1948,8 @@
                             const cols = chunk[i].map(c => String(c || '').trim());
                             if(cols.length < 3) continue; // Minimum required: Project, ID, Name
                             
-                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC
-                            const [pName, eId, eName, jobCat, typeRaw, cc1, cc2] = cols;
+                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, Payroll Item, PRIMARY CC, SECONDARY CC, ROUNDING CLASS
+                            const [pName, eId, eName, jobCat, typeRaw, payrollRaw, cc1, cc2, roundClassRaw] = cols;
                             if(!pName || !eName || !eId) continue;
 
                             let type = 'Regular';
@@ -1621,6 +1957,20 @@
                                 const tL = typeRaw.toLowerCase();
                                 if(tL.includes('local')) type = 'Local';
                                 else if(tL.includes('other')) type = 'Other Location';
+                            }
+
+                            let payrollItem = 'Hourly';
+                            if(payrollRaw) {
+                                const pL = payrollRaw.toLowerCase();
+                                if(pL.includes('salary')) payrollItem = 'Salary';
+                                else if(pL.includes('overtime')) payrollItem = 'Overtime';
+                                else if(pL.includes('sick')) payrollItem = 'Sick Pay';
+                            }
+
+                            let roundingClass = 'Rounding';
+                            if(roundClassRaw) {
+                                const rL = roundClassRaw.toLowerCase();
+                                if(rL.includes('exact')) roundingClass = 'Exact';
                             }
 
                             let projId = projCache[pName];
@@ -1653,7 +2003,7 @@
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
                                 project_id: projId, emp_id: eId, name: eName, 
-                                job_category: jobCat || '', type: type, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
+                                job_category: jobCat || '', type: type, payroll_item: payrollItem, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
                             }, {merge: true});
                             hasWrites = true;
                         }
@@ -1882,59 +2232,75 @@
 
                 let finalPagesHTML = '';
 
-                // 1. Process "Regular" (Max 25 per page, chunked PER category)
+                // 1. Process "Regular" (Max 27 rows per page, chunked PER category)
                 const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location'));
                 const categories = [...new Set(regularEmps.map(e => e.job_category || 'UNASSIGNED'))];
                 
                 categories.forEach(cat => {
                     const catEmps = regularEmps.filter(e => (e.job_category || 'UNASSIGNED') === cat);
-                    const chunks = this.chunkArray(catEmps, 25);
-                    chunks.forEach(chunk => {
-                        let rows = `<tr><td colspan="10" class="job-category-row">${cat}</td></tr>`;
+                    const chunks = this.chunkArray(catEmps, 26);
+                    chunks.forEach((chunk, chunkIdx) => {
+                        let catTitle = chunkIdx === 0 ? cat : `${cat} (Continued)`;
+                        let rows = `<tr><td colspan="10" class="job-category-row">${catTitle}</td></tr>`;
+                        let rowCount = 1;
                         chunk.forEach((emp, idx) => {
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
+                            rows += this.generateEmployeePrintRow(emp, idx + 1 + (chunkIdx * 26), getLog(emp.id), absentIds);
+                            rowCount++;
                         });
+                        for (let i = rowCount; i < 27; i++) {
+                            rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                        }
                         finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
                     });
                 });
 
-                // 2. Process "Local" (Max 25 per page, combined categories, category header row injected)
-                const localEmps = emps.filter(e => e.type === 'Local').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
-                if(localEmps.length > 0) {
-                    const chunks = this.chunkArray(localEmps, 25);
-                    chunks.forEach(chunk => {
-                        let rows = '';
-                        let currentCat = null;
-                        chunk.forEach((emp, idx) => {
-                            const empCat = emp.job_category || 'UNASSIGNED';
-                            if(empCat !== currentCat) {
-                                currentCat = empCat;
-                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
-                            }
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
-                        });
-                        finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
-                    });
-                }
+                const processCombinedCategories = (empList) => {
+                    if (empList.length === 0) return;
+                    
+                    let rows = '';
+                    let currentCat = null;
+                    let rowCount = 0;
+                    let empIdx = 1;
 
-                // 3. Process "Other Location" (Max 25 per page, same logic as Local)
-                const otherEmps = emps.filter(e => e.type === 'Other Location').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
-                if(otherEmps.length > 0) {
-                    const chunks = this.chunkArray(otherEmps, 25);
-                    chunks.forEach(chunk => {
-                        let rows = '';
-                        let currentCat = null;
-                        chunk.forEach((emp, idx) => {
-                            const empCat = emp.job_category || 'UNASSIGNED';
-                            if(empCat !== currentCat) {
-                                currentCat = empCat;
-                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
-                            }
-                            rows += this.generateEmployeePrintRow(emp, idx + 1, getLog(emp.id), absentIds);
-                        });
+                    const flushPage = () => {
+                        for (let i = rowCount; i < 27; i++) {
+                            rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                        }
                         finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
+                        rows = '';
+                        rowCount = 0;
+                    };
+
+                    empList.forEach(emp => {
+                        const empCat = emp.job_category || 'UNASSIGNED';
+                        
+                        if (empCat !== currentCat) {
+                            if (rowCount + 2 > 27) flushPage();
+                            currentCat = empCat;
+                            rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
+                            rowCount++;
+                        } else {
+                            if (rowCount + 1 > 27) {
+                                flushPage();
+                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat} (Continued)</td></tr>`;
+                                rowCount++;
+                            }
+                        }
+
+                        rows += this.generateEmployeePrintRow(emp, empIdx++, getLog(emp.id), absentIds);
+                        rowCount++;
                     });
-                }
+
+                    if (rowCount > 0) flushPage();
+                };
+
+                // 2. Process "Local"
+                const localEmps = emps.filter(e => e.type === 'Local').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
+                processCombinedCategories(localEmps);
+
+                // 3. Process "Other Location"
+                const otherEmps = emps.filter(e => e.type === 'Other Location').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
+                processCombinedCategories(otherEmps);
 
                 if(finalPagesHTML === '') {
                     return this.showModal('Notice', 'No employees exist to print for this project.');
@@ -1945,6 +2311,23 @@
             },
 
             // --- EXPORT & MISC ---
+            getPayrollItem(emp, log) {
+                if (log.total_hrs > 0 || (log.am_in && log.am_out)) {
+                    return emp.payroll_item || 'Hourly';
+                }
+                if (log.leave_type) {
+                    const lt = log.leave_type.toLowerCase();
+                    if (lt.includes('sick')) return 'Sick Pay';
+                    if (lt.includes('absent')) return 'Leave without pay';
+                    if (lt.includes('maternity')) return 'Maternity Leave';
+                    if (lt.includes('paternity')) return 'Paternity Leave';
+                    if (lt.includes('bereavement')) return 'Bereavement Leave';
+                    if (lt === 'leave' || lt === 'vacation leave') return 'Vacation Leave';
+                    return log.leave_type;
+                }
+                return emp.payroll_item || 'Hourly';
+            },
+
             exportPMData(isRounded) {
                 if(!this.activeProjectId) return this.showModal('Notice', 'Please select a project first.');
                 
@@ -1953,7 +2336,7 @@
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
 
-                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Total Hours,Cost Code Used\n";
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Total Hours,Cost Code Used\n";
                 const proj = this.projects.find(p => p.id === this.activeProjectId) || {};
 
                 emps.forEach(emp => {
@@ -1963,15 +2346,26 @@
                     let ai = log.am_in||'', ao = log.am_out||'', pi = log.pm_in||'', po = log.pm_out||'';
                     let total = log.total_hrs || 0;
 
-                    if(isRounded) {
+                    if(isRounded && emp.rounding_class !== 'Exact') {
                         ai = this.roundTime15m(ai); ao = this.roundTime15m(ao);
                         pi = this.roundTime15m(pi); po = this.roundTime15m(po);
                         total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+                        total = Math.round(total * 4) / 4;
                     }
 
+                    let regular = total;
+                    let overtime = 0;
+                    if (total > 8) {
+                        regular = 8;
+                        overtime = total - 8;
+                    }
+
+                    let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
+                    let pItem = this.getPayrollItem(emp, log);
+
                     const row = [
-                        targetDateStr, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${log.leave_type||''}"`,
-                        ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}${log.cost_code_changed ? ' (Edited)' : ''}"`
+                        targetDateStr, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${pItem}"`, `"${log.leave_type||''}"`,
+                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -1987,7 +2381,7 @@
                 const logs = this.getFilteredRecords();
                 if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
 
-                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Total Hours,Cost Code Used\n";
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Total Hours,Cost Code Used\n";
 
                 logs.forEach(log => {
                     const emp = this.employees.find(e => e.id === log.emp_id) || {};
@@ -1996,15 +2390,26 @@
                     let ai = log.am_in||'', ao = log.am_out||'', pi = log.pm_in||'', po = log.pm_out||'';
                     let total = log.total_hrs || 0;
 
-                    if(isRounded) {
+                    if(isRounded && emp.rounding_class !== 'Exact') {
                         ai = this.roundTime15m(ai); ao = this.roundTime15m(ao);
                         pi = this.roundTime15m(pi); po = this.roundTime15m(po);
                         total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+                        total = Math.round(total * 4) / 4;
                     }
 
+                    let regular = total;
+                    let overtime = 0;
+                    if (total > 8) {
+                        regular = 8;
+                        overtime = total - 8;
+                    }
+
+                    let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
+                    let pItem = this.getPayrollItem(emp, log);
+
                     const row = [
-                        log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${log.leave_type||''}"`,
-                        ai, ao, pi, po, total.toFixed(2), `"${log.cost_code_used||''}${log.cost_code_changed ? ' (Edited)' : ''}"`
+                        log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${pItem}"`, `"${log.leave_type||''}"`,
+                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -2030,10 +2435,18 @@
                     let ai = log.am_in||'', ao = log.am_out||'', pi = log.pm_in||'', po = log.pm_out||'';
                     let total = log.total_hrs || 0;
 
-                    if(isRounded) {
+                    if(isRounded && emp.rounding_class !== 'Exact') {
                         ai = this.roundTime15m(ai); ao = this.roundTime15m(ao);
                         pi = this.roundTime15m(pi); po = this.roundTime15m(po);
                         total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+                        total = Math.round(total * 4) / 4;
+                    }
+
+                    let regular = total;
+                    let overtime = 0;
+                    if (total > 8) {
+                        regular = 8;
+                        overtime = total - 8;
                     }
 
                     if (total > 0 || log.leave_type) {
@@ -2042,22 +2455,50 @@
                         const [yyyy, mm, dd] = dateStr.split('-');
                         const qbDate = (yyyy && mm && dd) ? `${mm}/${dd}/${yyyy}` : dateStr;
                         
-                        // Convert decimal hours to HH:MM format for QuickBooks
-                        const hours = Math.floor(total);
-                        const minutes = Math.round((total - hours) * 60);
-                        const duration = `${hours}:${minutes.toString().padStart(2, '0')}`;
+                        let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
+                        let pItem = this.getPayrollItem(emp, log);
 
-                        const row = [
-                            "TIMEREC",
-                            qbDate,
-                            proj.name || '',
-                            emp.name || '',
-                            log.cost_code_used || '',
-                            '', // PITEM
-                            duration,
-                            log.leave_type ? `Leave: ${log.leave_type}` : ''
-                        ];
-                        iifContent += row.join('\t') + "\n";
+                        if (regular > 0) {
+                            const row = [
+                                "TIMEREC",
+                                qbDate,
+                                proj.name || '',
+                                emp.name || '',
+                                cleanCostCode,
+                                pItem, // PITEM
+                                regular.toFixed(2),
+                                log.leave_type ? `Leave: ${log.leave_type}` : ''
+                            ];
+                            iifContent += row.join('\t') + "\n";
+                        }
+                        
+                        if (overtime > 0) {
+                            const rowOT = [
+                                "TIMEREC",
+                                qbDate,
+                                proj.name || '',
+                                emp.name || '',
+                                cleanCostCode,
+                                'Overtime', // PITEM for overtime
+                                overtime.toFixed(2),
+                                log.leave_type ? `Leave: ${log.leave_type}` : ''
+                            ];
+                            iifContent += rowOT.join('\t') + "\n";
+                        }
+                        
+                        if (total === 0 && log.leave_type) {
+                            const rowLeave = [
+                                "TIMEREC",
+                                qbDate,
+                                proj.name || '',
+                                emp.name || '',
+                                cleanCostCode,
+                                pItem,
+                                "0.00",
+                                `Leave: ${log.leave_type}`
+                            ];
+                            iifContent += rowLeave.join('\t') + "\n";
+                        }
                     }
                 });
 
@@ -2507,10 +2948,13 @@
                     const dateVal = document.getElementById('demo-date').value;
                     const timeVal = document.getElementById('demo-time').value;
                     if(!dateVal || !timeVal) return this.showModal("Error", "Select both a target date and time.");
-                    const targetDate = new Date(`${dateVal}T${timeVal}`);
+                    
+                    // Parse as Guam time (UTC+10)
+                    const targetDate = new Date(`${dateVal}T${timeVal}:00+10:00`);
                     const realNetworkTime = Date.now() + this.timeOffset;
                     this.demoOffset = targetDate.getTime() - realNetworkTime;
-                    this.showModal("Time Warped", `System time is now simulating ${targetDate.toLocaleString()}`);
+                    
+                    this.showModal("Time Warped", `System time is now simulating ${targetDate.toLocaleString('en-US', { timeZone: 'Pacific/Guam' })} (Guam Time)`);
                     this.renderRoster(); this.renderTimesheetEdit();
                 };
                 
