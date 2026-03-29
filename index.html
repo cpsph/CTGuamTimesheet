@@ -2715,14 +2715,26 @@
                     const submitBtn = document.getElementById('btn-modal-confirm');
                     submitBtn.innerText = "Deleting..."; submitBtn.disabled = true;
                     
-                    const chunks = this.chunkArray(recordsToDelete, 400);
-                    for (const chunk of chunks) {
-                        const batch = writeBatch(db);
-                        chunk.forEach(rec => {
-                            batch.delete(docPath('timesheets', rec.id));
+                const chunks = this.chunkArray(recordsToDelete, 400);
+                for (const chunk of chunks) {
+                    const batch = writeBatch(db);
+                    chunk.forEach(rec => {
+                        // Deletes the timesheet
+                        batch.delete(docPath('timesheets', rec.id)); 
+                        
+                        // ADD THIS LINE: Also deletes the submission lock associated with it
+                        batch.delete(docPath('submissions', `${rec.project_id}_${rec.date}`));
+                    });
+                    
+                    // If "Erase ALL" is checked, let's also wipe orphaned submissions just in case
+                    if (eraseAll) {
+                        this.submissions.forEach(sub => {
+                            batch.delete(docPath('submissions', sub.id));
                         });
-                        await batch.commit();
                     }
+                    
+                    await batch.commit();
+                }
                     
                     this.hideModal(); this.showModal("Success", `${recordsToDelete.length} records have been permanently deleted.`);
                 } catch(e) {
