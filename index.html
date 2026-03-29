@@ -193,7 +193,10 @@
                 <div id="timesheet-locked-view" class="hidden flex-col space-y-6">
                     <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-800">Timesheet Records</h2>
+                            <div class="flex items-center space-x-3">
+                                <h2 class="text-lg font-bold text-slate-800">Timesheet Records</h2>
+                                <div id="timesheet-status-badge"></div>
+                            </div>
                             <p class="text-sm text-slate-500">Review, adjust specific times, assign cost codes, and print DTR.</p>
                             <div class="mt-2 flex items-center space-x-2">
                                 <label class="text-sm font-medium text-slate-700">Select Date:</label>
@@ -392,6 +395,7 @@
                                 <tr>
                                     <th class="px-4 py-3">Project</th>
                                     <th class="px-4 py-3">Date</th>
+                                    <th class="px-4 py-3">Status</th>
                                     <th class="px-4 py-3">Emp ID</th>
                                     <th class="px-4 py-3">Name</th>
                                     <th class="px-4 py-3">AM IN</th>
@@ -806,7 +810,7 @@
                 
                 let tabs = [];
                 if(this.profile.role === 'admin') {
-                    tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
+                    tabs = ['pm-roster', 'pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
                 } else if (this.profile.role === 'tk') {
                     tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions'];
                     if (this.companySettings?.demoPermissions?.tk) tabs.push('admin-demo');
@@ -886,7 +890,7 @@
                 const rSel = document.getElementById('admin-roster-project-filter');
                 
                 let allowedProjects = this.projects;
-                if (this.profile && this.profile.role === 'pm') {
+                if (this.profile && this.profile.role !== 'admin') {
                     const assigned = this.profile.assigned_projects || [];
                     allowedProjects = this.projects.filter(p => assigned.includes(p.id));
                 }
@@ -1303,6 +1307,21 @@
                 const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
                 const isSubmitted = existingSubmission && existingSubmission.status !== 'rejected';
                 
+                const statusBadgeEl = document.getElementById('timesheet-status-badge');
+                if (statusBadgeEl) {
+                    if (existingSubmission) {
+                        if (existingSubmission.status === 'approved') {
+                            statusBadgeEl.innerHTML = '<span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-xs font-bold uppercase">Approved</span>';
+                        } else if (existingSubmission.status === 'pending') {
+                            statusBadgeEl.innerHTML = '<span class="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-bold uppercase">Pending Approval</span>';
+                        } else if (existingSubmission.status === 'rejected') {
+                            statusBadgeEl.innerHTML = '<span class="px-2 py-1 bg-rose-100 text-rose-800 rounded text-xs font-bold uppercase">Rejected</span>';
+                        }
+                    } else {
+                        statusBadgeEl.innerHTML = '<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-bold uppercase">Not Submitted</span>';
+                    }
+                }
+
                 const submitBtn = document.getElementById('btn-submit-timesheet');
                 if (submitBtn) {
                     if (this.profile.role === 'tk' && !isSubmitted) {
@@ -1431,8 +1450,12 @@
                             const updateType = document.querySelector('input[name="cc_update_type"]:checked').value;
                             try {
                                 const updateData = {};
-                                if (updateType === 'cc1') updateData.cost_code_1 = cc;
-                                else updateData.cost_code_2 = cc;
+                                if (updateType === 'cc1') {
+                                    updateData.cost_code_1 = cc;
+                                    updateData.cost_code_2 = emp.cost_code_1 || '';
+                                } else {
+                                    updateData.cost_code_2 = cc;
+                                }
                                 await setDoc(docPath('employees', empId), updateData, { merge: true });
                                 this.showToast('Employee masterlist updated.');
                                 this.hideModal();
@@ -2381,6 +2404,32 @@
                 const logs = this.getFilteredRecords();
                 if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
 
+                const pendingLogs = logs.filter(r => {
+                    const sub = this.submissions.find(s => s.project_id === r.project_id && s.date === r.date);
+                    return sub && sub.status === 'pending';
+                });
+
+                const approvedLogs = logs.filter(r => {
+                    const sub = this.submissions.find(s => s.project_id === r.project_id && s.date === r.date);
+                    return sub && sub.status === 'approved';
+                });
+
+                if (pendingLogs.length > 0) {
+                    this.showFormModal('Pending Approvals', `
+                        <p class="mb-4">There are <strong>${pendingLogs.length}</strong> timesheet records pending approval by a Project Manager.</p>
+                        <p class="mb-4 text-amber-600 font-medium">Only approved timesheets will be exported. Do you want to continue exporting the <strong>${approvedLogs.length}</strong> approved records?</p>
+                    `, () => {
+                        this.hideModal();
+                        if (approvedLogs.length === 0) return this.showModal('Notice', 'No approved records to export.');
+                        this.generateCSV(approvedLogs, isRounded);
+                    });
+                } else {
+                    if (approvedLogs.length === 0) return this.showModal('Notice', 'No approved records to export.');
+                    this.generateCSV(approvedLogs, isRounded);
+                }
+            },
+
+            generateCSV(logs, isRounded) {
                 let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Total Hours,Cost Code Used\n";
 
                 logs.forEach(log => {
@@ -2425,6 +2474,32 @@
                 const logs = this.getFilteredRecords();
                 if(logs.length === 0) return this.showModal('Notice', 'No records found to export with the current filters.');
 
+                const pendingLogs = logs.filter(r => {
+                    const sub = this.submissions.find(s => s.project_id === r.project_id && s.date === r.date);
+                    return sub && sub.status === 'pending';
+                });
+
+                const approvedLogs = logs.filter(r => {
+                    const sub = this.submissions.find(s => s.project_id === r.project_id && s.date === r.date);
+                    return sub && sub.status === 'approved';
+                });
+
+                if (pendingLogs.length > 0) {
+                    this.showFormModal('Pending Approvals', `
+                        <p class="mb-4">There are <strong>${pendingLogs.length}</strong> timesheet records pending approval by a Project Manager.</p>
+                        <p class="mb-4 text-amber-600 font-medium">Only approved timesheets will be exported. Do you want to continue exporting the <strong>${approvedLogs.length}</strong> approved records?</p>
+                    `, () => {
+                        this.hideModal();
+                        if (approvedLogs.length === 0) return this.showModal('Notice', 'No approved records to export.');
+                        this.generateIIF(approvedLogs, isRounded);
+                    });
+                } else {
+                    if (approvedLogs.length === 0) return this.showModal('Notice', 'No approved records to export.');
+                    this.generateIIF(approvedLogs, isRounded);
+                }
+            },
+
+            generateIIF(logs, isRounded) {
                 // Basic IIF header for Time Tracking
                 let iifContent = "!TIMEREC\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tNOTE\n";
 
@@ -2533,18 +2608,27 @@
                 document.getElementById('pagination-info').innerText = `Page ${this.currentPage} of ${totalPages} (Showing ${paginatedRecords.length} records across ${currentDates.length} day/s)`;
 
                 if(paginatedRecords.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No records found.</span></div></td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="11" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No records found.</span></div></td></tr>`;
                     return;
                 }
 
                 paginatedRecords.forEach(r => {
                     const emp = this.employees.find(e => e.id === r.emp_id) || {};
                     const proj = this.projects.find(p => p.id === r.project_id) || {};
+                    const sub = this.submissions.find(s => s.project_id === r.project_id && s.date === r.date);
+                    
+                    let statusBadge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase">Not Submitted</span>';
+                    if (sub) {
+                        if (sub.status === 'approved') statusBadge = '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold uppercase">Approved</span>';
+                        else if (sub.status === 'pending') statusBadge = '<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-bold uppercase">Pending</span>';
+                        else if (sub.status === 'rejected') statusBadge = '<span class="px-2 py-0.5 bg-rose-100 text-rose-800 rounded text-[10px] font-bold uppercase">Rejected</span>';
+                    }
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 transition border-b">
                             <td class="px-4 py-3 text-slate-600 truncate max-w-[150px]">${proj.name || 'Unknown'}</td>
                             <td class="px-4 py-3 text-slate-600 font-medium">${r.date}</td>
+                            <td class="px-4 py-3">${statusBadge}</td>
                             <td class="px-4 py-3 text-xs">${emp.emp_id || '-'}</td>
                             <td class="px-4 py-3 font-medium">${emp.name || 'Unknown'}</td>
                             <td class="px-4 py-3">${r.am_in || '-'}</td>
@@ -2651,7 +2735,7 @@
 
                 this.users.forEach(u => {
                     let assignedNames = 'All (Admin)';
-                    if (u.role === 'pm') {
+                    if (u.role !== 'admin') {
                         if (u.assigned_projects && u.assigned_projects.length > 0) {
                             assignedNames = u.assigned_projects.map(pid => {
                                 const p = this.projects.find(x => x.id === pid);
@@ -2662,8 +2746,8 @@
                         }
                     }
                     
-                    let roleDisplay = `<span class="${u.role==='admin'?'text-blue-600':'text-amber-600'}">${u.role}</span>`;
-                    if (u.role === 'pm' && u.has_demo_access) {
+                    let roleDisplay = `<span class="${u.role==='admin'?'text-blue-600':(u.role==='pm'?'text-amber-600':'text-emerald-600')}">${u.role}</span>`;
+                    if (u.role !== 'admin' && u.has_demo_access) {
                         roleDisplay += ` <span class="ml-2 bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] tracking-wide font-bold">+ DEMO</span>`;
                     }
                     
@@ -2702,12 +2786,13 @@
                     <input type="text" id="nu-name" placeholder="Full Name" value="${u.name}" class="w-full px-3 py-2 border rounded mb-3 outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="nu-username" placeholder="Username" value="${u.username}" class="w-full px-3 py-2 border rounded mb-3 outline-none focus:ring-2 focus:ring-blue-500" ${username ? 'readonly bg-slate-100' : ''}>
                     <input type="password" id="nu-pass" placeholder="${username ? 'Leave blank to keep current password' : 'Password'}" class="w-full px-3 py-2 border rounded mb-3 outline-none focus:ring-2 focus:ring-blue-500">
-                    <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none mb-3 focus:ring-2 focus:ring-blue-500" onchange="document.getElementById('pm-options-container').classList.toggle('hidden', this.value !== 'pm')">
+                    <select id="nu-role" class="w-full px-3 py-2 border rounded outline-none mb-3 focus:ring-2 focus:ring-blue-500" onchange="document.getElementById('pm-options-container').classList.toggle('hidden', this.value === 'admin')">
+                        <option value="tk" ${u.role === 'tk' ? 'selected' : ''}>Timekeeper (TK)</option>
                         <option value="pm" ${u.role === 'pm' ? 'selected' : ''}>Project Manager (PM)</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>System Admin</option>
                     </select>
                     
-                    <div id="pm-options-container" class="${u.role === 'pm' ? '' : 'hidden'}">
+                    <div id="pm-options-container" class="${u.role === 'admin' ? 'hidden' : ''}">
                         <div class="border border-slate-200 p-3 rounded bg-slate-50 mb-3 flex flex-col">
                             <div class="flex justify-between items-center mb-2">
                                 <span class="block text-xs font-bold text-slate-500 uppercase">Assign Projects</span>
@@ -2732,8 +2817,8 @@
                     const name = document.getElementById('nu-name').value.trim();
                     const pass = document.getElementById('nu-pass').value;
                     const role = document.getElementById('nu-role').value;
-                    const assigned_projects = role === 'pm' ? Array.from(document.querySelectorAll('.user-proj-chk:checked')).map(c => c.value) : [];
-                    const has_demo_access = role === 'pm' ? document.getElementById('nu-demo-access').checked : false;
+                    const assigned_projects = role !== 'admin' ? Array.from(document.querySelectorAll('.user-proj-chk:checked')).map(c => c.value) : [];
+                    const has_demo_access = role !== 'admin' ? document.getElementById('nu-demo-access').checked : false;
 
                     if(!un || !name) return this.showModal('Error', 'Username and Name are required.');
                     if(!username && !pass) return this.showModal('Error', 'Password is required for new users.');
