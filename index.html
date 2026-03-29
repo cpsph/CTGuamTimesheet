@@ -207,7 +207,7 @@
                             <button onclick="app.activeProjectId = null; app.switchTab('pm-timesheet');" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition flex items-center shadow-sm border border-slate-300">
                                 Change Project
                             </button>
-                            <div class="relative group">
+                            <div class="relative group" id="btn-export-csv-pm">
                                 <button class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Export CSV
                                 </button>
@@ -608,6 +608,18 @@
             currentPage: 1,
             daysPerPage: 10,
 
+            _renderAdminRosterTimeout: null,
+            debouncedRenderAdminRoster() {
+                if (this._renderAdminRosterTimeout) clearTimeout(this._renderAdminRosterTimeout);
+                this._renderAdminRosterTimeout = setTimeout(() => this.renderAdminRoster(), 100);
+            },
+
+            _renderAllRecordsTableTimeout: null,
+            debouncedRenderAllRecordsTable() {
+                if (this._renderAllRecordsTableTimeout) clearTimeout(this._renderAllRecordsTableTimeout);
+                this._renderAllRecordsTableTimeout = setTimeout(() => this.renderAllRecordsTable(), 100);
+            },
+
             async init() {
                 await this.syncNetworkTime();
                 this.updateClock();
@@ -733,32 +745,35 @@
                         if (!this.companySettings.demoPermissions) {
                             this.companySettings.demoPermissions = { pm: false, tk: false };
                         }
-                        const nameEl = document.getElementById('settings-company-name');
-                        const addrEl = document.getElementById('settings-company-address');
-                        const logoEl = document.getElementById('settings-logo-preview');
-                        if(nameEl) nameEl.value = this.companySettings.name || 'PHC CORPORATION';
-                        if(addrEl) addrEl.value = this.companySettings.address || '';
-                        if(logoEl && this.companySettings.logo_url) logoEl.innerHTML = `<img src="${this.companySettings.logo_url}" class="max-w-full max-h-full object-contain">`;
-                        
-                        const togglePm = document.getElementById('toggle-demo-pm');
-                        const toggleTk = document.getElementById('toggle-demo-tk');
-                        if (togglePm) togglePm.checked = this.companySettings.demoPermissions.pm;
-                        if (toggleTk) toggleTk.checked = this.companySettings.demoPermissions.tk;
-                        
-                        this.updateNavVisibility();
+                    } else {
+                        this.companySettings = { demoPermissions: { pm: false, tk: false } };
                     }
+                    
+                    const nameEl = document.getElementById('settings-company-name');
+                    const addrEl = document.getElementById('settings-company-address');
+                    const logoEl = document.getElementById('settings-logo-preview');
+                    if(nameEl) nameEl.value = this.companySettings.name || 'PHC CORPORATION';
+                    if(addrEl) addrEl.value = this.companySettings.address || '';
+                    if(logoEl && this.companySettings.logo_url) logoEl.innerHTML = `<img src="${this.companySettings.logo_url}" class="max-w-full max-h-full object-contain">`;
+                    
+                    const togglePm = document.getElementById('toggle-demo-pm');
+                    const toggleTk = document.getElementById('toggle-demo-tk');
+                    if (togglePm) togglePm.checked = this.companySettings.demoPermissions.pm;
+                    if (toggleTk) toggleTk.checked = this.companySettings.demoPermissions.tk;
+                    
+                    this.updateNavVisibility();
                 }));
 
                 this.unsubs.push(onSnapshot(collPath('projects'), snap => {
                     this.projects = []; snap.forEach(d => this.projects.push({id: d.id, ...d.data()}));
                     this.renderProjects();
                     this.populateProjectSelects();
-                    if(this.profile.role === 'admin') this.renderAdminRoster();
+                    if(this.profile.role === 'admin') this.debouncedRenderAdminRoster();
                 }));
                 this.unsubs.push(onSnapshot(collPath('employees'), snap => {
                     this.employees = []; snap.forEach(d => this.employees.push({id: d.id, ...d.data()}));
                     if(this.activeProjectId) this.renderRoster();
-                    if(this.profile.role === 'admin') this.renderAdminRoster();
+                    if(this.profile.role === 'admin') this.debouncedRenderAdminRoster();
                 }));
                 this.unsubs.push(onSnapshot(collPath('timesheets'), snap => {
                     this.timesheets = []; snap.forEach(d => this.timesheets.push({id: d.id, ...d.data()}));
@@ -766,7 +781,7 @@
                         this.renderRoster();
                         this.renderTimesheetEdit();
                     }
-                    if(this.profile.role === 'admin') this.renderAllRecordsTable();
+                    if(this.profile.role === 'admin') this.debouncedRenderAllRecordsTable();
                 }));
                 this.unsubs.push(onSnapshot(collPath('submissions'), snap => {
                     this.submissions = []; snap.forEach(d => this.submissions.push({id: d.id, ...d.data()}));
@@ -813,10 +828,10 @@
                     tabs = ['pm-roster', 'pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
                 } else if (this.profile.role === 'tk') {
                     tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions'];
-                    if (this.companySettings?.demoPermissions?.tk) tabs.push('admin-demo');
+                    if (this.companySettings?.demoPermissions?.tk || this.profile.has_demo_access) tabs.push('admin-demo');
                 } else if (this.profile.role === 'pm') {
                     tabs = ['pm-timesheet', 'pm-submissions'];
-                    if (this.companySettings?.demoPermissions?.pm) tabs.push('admin-demo');
+                    if (this.companySettings?.demoPermissions?.pm || this.profile.has_demo_access) tabs.push('admin-demo');
                 }
 
                 document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
@@ -828,12 +843,21 @@
                     const btn = document.getElementById(`tab-btn-${t}`);
                     if(btn) btn.classList.remove('hidden');
                 });
+
+                const exportBtn = document.getElementById('btn-export-csv-pm');
+                if (exportBtn) {
+                    if (this.profile.role === 'admin') {
+                        exportBtn.classList.remove('hidden');
+                    } else {
+                        exportBtn.classList.add('hidden');
+                    }
+                }
             },
 
             async updateDemoPermissions(role, isChecked) {
                 if (this.profile.role !== 'admin') return;
                 try {
-                    const currentPerms = this.companySettings.demoPermissions || { pm: false, tk: false };
+                    const currentPerms = (this.companySettings && this.companySettings.demoPermissions) ? this.companySettings.demoPermissions : { pm: false, tk: false };
                     currentPerms[role] = isChecked;
                     await setDoc(docPath('settings', 'company'), { demoPermissions: currentPerms }, { merge: true });
                     this.showToast(`Demo access for ${role.toUpperCase()} updated.`);
@@ -858,20 +882,20 @@
                 }
                 if (tabId === 'pm-roster' || tabId === 'pm-timesheet') {
                     if (!this.activeProjectId) {
-                        projSelector.classList.replace('hidden', 'flex');
+                        if (projSelector) { projSelector.classList.remove('hidden'); projSelector.classList.add('flex'); }
                         const rLocked = document.getElementById('roster-locked-view');
-                        if (rLocked) rLocked.classList.replace('flex', 'hidden');
+                        if (rLocked) { rLocked.classList.remove('flex'); rLocked.classList.add('hidden'); }
                         const tLocked = document.getElementById('timesheet-locked-view');
-                        if (tLocked) tLocked.classList.replace('flex', 'hidden');
+                        if (tLocked) { tLocked.classList.remove('flex'); tLocked.classList.add('hidden'); }
                     } else {
-                        projSelector.classList.replace('flex', 'hidden');
+                        if (projSelector) { projSelector.classList.remove('flex'); projSelector.classList.add('hidden'); }
                         const rLocked = document.getElementById('roster-locked-view');
-                        if (rLocked) rLocked.classList.replace('hidden', 'flex');
+                        if (rLocked) { rLocked.classList.remove('hidden'); rLocked.classList.add('flex'); }
                         const tLocked = document.getElementById('timesheet-locked-view');
-                        if (tLocked) tLocked.classList.replace('hidden', 'flex');
+                        if (tLocked) { tLocked.classList.remove('hidden'); tLocked.classList.add('flex'); }
                     }
                 } else {
-                    projSelector.classList.replace('flex', 'hidden');
+                    if (projSelector) { projSelector.classList.remove('flex'); projSelector.classList.add('hidden'); }
                 }
 
                 if (tabId === 'admin-demo') {
@@ -1050,12 +1074,13 @@
                     return;
                 }
 
+                let html = '';
                 emps.forEach(emp => {
                     const logId = `${emp.id}_${todayStr}`;
                     const log = this.timesheets.find(t => t.id === logId);
                     const loggedMsg = log && (log.am_in || log.pm_in) ? `<span class=\"text-[10px] ml-2 bg-green-100 text-green-700 px-1 rounded uppercase\">Logged</span>` : '';
 
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 border-b">
                             <td class="px-6 py-3 text-center"><input type="checkbox" class="roster-chk w-4 h-4 text-blue-600 rounded" value="${emp.id}" checked></td>
                             <td class="px-6 py-3 font-medium">${emp.emp_id}</td>
@@ -1066,6 +1091,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
 
                 document.getElementById('check-all-roster').onchange = (e) => {
                     document.querySelectorAll('.roster-chk').forEach(c => c.checked = e.target.checked);
@@ -1336,6 +1362,7 @@
                     return;
                 }
 
+                let html = '';
                 emps.forEach(emp => {
                     const docId = `${emp.id}_${targetDateStr}`;
                     const log = this.timesheets.find(t => t.id === docId) || { am_in:'', am_out:'', pm_in:'', pm_out:'', cost_code_used: emp.cost_code_1, leave_type: '' };
@@ -1352,7 +1379,7 @@
                         `;
                     }
 
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
                             <td class="px-4 py-2 font-medium">${emp.emp_id}</td>
                             <td class="px-4 py-2 text-sm">${emp.name}</td>
@@ -1378,6 +1405,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
             },
 
             toggleEditRow(empId, docId) {
@@ -1567,13 +1595,14 @@
                     subs = subs.filter(s => s.status === filterStatus);
                 }
 
-                subs.sort((a, b) => b.created_at - a.created_at);
+                subs.sort((a, b) => b.date.localeCompare(a.date));
 
                 if (subs.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No submissions found.</td></tr>`;
                     return;
                 }
 
+                let html = '';
                 subs.forEach(s => {
                     const proj = this.projects.find(p => p.id === s.project_id);
                     const projName = proj ? proj.name : 'Unknown Project';
@@ -1597,7 +1626,7 @@
                         actions = '<span class="text-xs text-slate-400">No actions</span>';
                     }
 
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 border-b">
                             <td class="px-6 py-4 font-medium">${s.date}</td>
                             <td class="px-6 py-4">${projName}</td>
@@ -1607,6 +1636,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
             },
 
             async updateSubmissionStatus(subId, newStatus) {
@@ -2590,15 +2620,14 @@
                 const start = document.getElementById('filter-start')?.value;
                 const end = document.getElementById('filter-end')?.value;
                 if (pid) filtered = filtered.filter(r => r.project_id === pid);
-                if (start) filtered = filtered.filter(r => new Date(r.date) >= new Date(start));
-                if (end) filtered = filtered.filter(r => new Date(r.date) <= new Date(end));
-                return filtered.sort((a,b) => new Date(b.date) - new Date(a.date));
+                if (start) filtered = filtered.filter(r => r.date >= start);
+                if (end) filtered = filtered.filter(r => r.date <= end);
+                return filtered.sort((a,b) => b.date.localeCompare(a.date));
             },
 
             renderAllRecordsTable() {
                 const tbody = document.getElementById('all-records-body');
                 if(!tbody) return;
-                tbody.innerHTML = '';
                 const records = this.getFilteredRecords();
                 const uniqueDates = [...new Set(records.map(r => r.date))];
                 const totalPages = Math.ceil(uniqueDates.length / this.daysPerPage) || 1;
@@ -2612,6 +2641,7 @@
                     return;
                 }
 
+                let html = '';
                 paginatedRecords.forEach(r => {
                     const emp = this.employees.find(e => e.id === r.emp_id) || {};
                     const proj = this.projects.find(p => p.id === r.project_id) || {};
@@ -2624,7 +2654,7 @@
                         else if (sub.status === 'rejected') statusBadge = '<span class="px-2 py-0.5 bg-rose-100 text-rose-800 rounded text-[10px] font-bold uppercase">Rejected</span>';
                     }
 
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 transition border-b">
                             <td class="px-4 py-3 text-slate-600 truncate max-w-[150px]">${proj.name || 'Unknown'}</td>
                             <td class="px-4 py-3 text-slate-600 font-medium">${r.date}</td>
@@ -2640,6 +2670,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
             },
 
             showResetDataModal() {
@@ -3007,7 +3038,7 @@
                 document.getElementById('btn-signout').onclick = () => { localStorage.removeItem('pm_session_username'); window.location.reload(); };
                 document.getElementById('btn-change-password').onclick = () => this.showChangePasswordModal();
 
-                const tbs = ['pm-roster', 'pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
+                const tbs = ['pm-roster', 'pm-timesheet', 'pm-submissions', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
                 tbs.forEach(t => { const el = document.getElementById(`tab-btn-${t}`); if(el) el.onclick = () => this.switchTab(t); });
 
                 document.getElementById('btn-validate-gps').onclick = () => this.validateGPS();
