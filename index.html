@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corporate Timesheet System - Manager Portal</title>
+    <title>Corporate Timesheet System - Timesheet Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- ADDED: SheetJS Library for Excel Parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -52,7 +52,7 @@
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center space-x-3">
                     <svg class="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                    <span class="font-bold text-xl tracking-tight">CoreTech PM Portal</span>
+                    <span class="font-bold text-xl tracking-tight">Timesheet Portal</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <div id="live-clock" class="text-sm font-medium bg-blue-800 px-3 py-1 rounded-full hidden sm:block transition-colors"></div>
@@ -1149,7 +1149,6 @@
                             </div>
                             <select class="modal-roster-leave text-xs border border-slate-300 rounded px-2 py-1 outline-none ${isChecked ? 'hidden' : ''}" data-emp="${emp.id}">
                                 <option value="">Just Late/Waiting</option>
-                                <option value="Absent">Absent</option>
                                 <option value="Leave without pay">Leave without pay</option>
                                 <option value="Sick Pay">Sick Pay</option>
                                 <option value="Salary">Salary</option>
@@ -1285,6 +1284,9 @@
 
                             if (checkedIds.includes(empId)) {
                                 // Guard clauses to prevent OUT if IN is missing
+                                if (data.leave_type === 'Leave without pay' && (type === 'AM_OUT' || type === 'PM_IN' || type === 'PM_OUT')) {
+                                    skippedCount++; continue;
+                                }
                                 if (type === 'AM_OUT' && !data.am_in) { skippedCount++; continue; }
                                 if (type === 'PM_OUT' && !data.pm_in) { skippedCount++; continue; }
 
@@ -1406,7 +1408,6 @@
                             <td class="px-4 py-2">
                                 <select class="edit-leave border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>
                                     <option value="" ${!log.leave_type ? 'selected' : ''}>Present</option>
-                                    <option value="Absent" ${log.leave_type === 'Absent' ? 'selected' : ''}>Absent</option>
                                     <option value="Leave without pay" ${log.leave_type === 'Leave without pay' ? 'selected' : ''}>Leave without pay</option>
                                     <option value="Sick Pay" ${log.leave_type === 'Sick Pay' ? 'selected' : ''}>Sick Pay</option>
                                     <option value="Salary" ${log.leave_type === 'Salary' ? 'selected' : ''}>Salary</option>
@@ -2659,6 +2660,17 @@
                         total = Math.round(total * 4) / 4;
                     }
 
+                    const paidLeaves = ['Salary', 'Sick Pay', 'Maternity Leave', 'Paternity Leave', 'Bereavement Leave', 'Maternity', 'Bereavement', 'Paternity'];
+                    const isPaidLeave = log.leave_type && paidLeaves.includes(log.leave_type);
+
+                    // Skip if no time record and not a paid leave
+                    if (total === 0 && !isPaidLeave) return;
+
+                    // Paid leaves without time records get 8 hours
+                    if (total === 0 && isPaidLeave) {
+                        total = 8;
+                    }
+
                     let regular = total;
                     let overtime = 0;
                     let undertime = 0;
@@ -2669,7 +2681,7 @@
                         undertime = 8 - total;
                     }
 
-                    if (total > 0 || log.leave_type) {
+                    if (total > 0) {
                         // Format date to MM/DD/YYYY for QuickBooks
                         const dateStr = log.date || this.getTodayDateStr();
                         const [yyyy, mm, dd] = dateStr.split('-');
@@ -2730,23 +2742,6 @@
                                 "0"  // BILLINGSTATUS
                             ];
                             iifContent += rowUT.join('\t') + "\n";
-                        }
-                        
-                        if (total === 0 && log.leave_type) {
-                            const rowLeave = [
-                                "TIMEACT",
-                                qbDate,
-                                escapeIIF(proj.name),
-                                escapeIIF(emp.name),
-                                "", // ITEM remains blank
-                                escapeIIF(pItem),
-                                "0.00",
-                                escapeIIF(cleanCostCode),
-                                escapeIIF(note),
-                                "N", // XFERTOPAYROLL
-                                "0"  // BILLINGSTATUS
-                            ];
-                            iifContent += rowLeave.join('\t') + "\n";
                         }
                     }
                 });
