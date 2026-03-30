@@ -77,22 +77,34 @@
         </div>
 
         <!-- LOGIN SCREEN -->
-        <div id="view-login" class="hidden bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-200 fade-in">
-            <h2 class="text-2xl font-bold text-center text-slate-800 mb-2">Manager Portal</h2>
-            <p class="text-sm text-center text-slate-500 mb-6">Sign in with your PM or Admin credentials.</p>
-            <form id="login-form" class="space-y-4">
+        <div id="view-login" class="hidden bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 fade-in flex-col relative overflow-hidden">
+            <!-- Decorative background element -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+            
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 text-blue-600 mb-4 ring-8 ring-blue-50/50">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Timesheet Portal</h2>
+                <p class="text-sm text-slate-500 mt-2">Sign in to manage your daily records.</p>
+            </div>
+            
+            <form id="login-form" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                    <input type="text" id="login-username" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Username</label>
+                    <input type="text" id="login-username" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400" placeholder="Enter your username">
                 </div>
                 <div class="relative">
-                    <label class="block text-sm font-medium text-slate-700 mb-1 mt-3">Password</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none pr-10">
-                    <button type="button" onclick="const p = document.getElementById('login-password'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-[34px] text-slate-400 hover:text-slate-600">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5 mt-3">Password</label>
+                    <input type="password" id="login-password" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400 pr-12" placeholder="••••••••">
+                    <button type="button" onclick="const p = document.getElementById('login-password'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-[44px] p-1 text-slate-400 hover:text-blue-600 transition-colors rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     </button>
                 </div>
-                <button type="submit" id="btn-login-submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow transition mt-4 flex justify-center items-center">Secure Sign In</button>
+                <button type="submit" id="btn-login-submit" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all mt-6 flex justify-center items-center group">
+                    <span>Secure Sign In</span>
+                    <svg class="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
             </form>
         </div>
 
@@ -216,6 +228,10 @@
                                     <button onclick="app.exportPMData(true)" class="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export Rounded (15m)</button>
                                 </div>
                             </div>
+                            <button onclick="app.openBulkEditTimeModal()" class="bg-indigo-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-indigo-700 transition flex items-center shadow-sm">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                Bulk Edit Time
+                            </button>
                             <button id="btn-print-dtr" class="bg-slate-800 text-white px-5 py-2 rounded-lg font-medium hover:bg-slate-900 transition flex items-center shadow-sm">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 Print Daily Time Record
@@ -232,6 +248,7 @@
                             <table class="w-full text-sm text-left whitespace-nowrap">
                                 <thead class="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 border-b border-slate-200 z-10">
                                     <tr>
+                                        <th class="px-4 py-3 w-10 text-center"><input type="checkbox" id="bulk-edit-select-all" onclick="app.toggleBulkEditSelectAll(this)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"></th>
                                         <th class="px-4 py-3">Emp ID</th>
                                         <th class="px-4 py-3">Name</th>
                                         <th class="px-4 py-3">Leave Type</th>
@@ -825,12 +842,12 @@
                 
                 let tabs = [];
                 if(this.profile.role === 'admin') {
-                    tabs = ['pm-roster', 'pm-timesheet', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
+                    tabs = ['pm-timesheet', 'pm-submissions', 'admin-projects', 'admin-roster', 'admin-all-records', 'admin-users', 'admin-settings', 'admin-demo'];
                 } else if (this.profile.role === 'tk') {
                     tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions'];
                     if (this.companySettings?.demoPermissions?.tk || this.profile.has_demo_access) tabs.push('admin-demo');
                 } else if (this.profile.role === 'pm') {
-                    tabs = ['pm-timesheet', 'pm-submissions'];
+                    tabs = ['pm-roster', 'pm-timesheet', 'pm-submissions'];
                     if (this.companySettings?.demoPermissions?.pm || this.profile.has_demo_access) tabs.push('admin-demo');
                 }
 
@@ -1101,7 +1118,7 @@
             bulkAction(type) {
                 if(!this.activeProjectId) return;
                 
-                const targetDateStr = this.getTimesheetDateStr();
+                const targetDateStr = this.getTodayDateStr();
                 const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
                 if (existingSubmission && existingSubmission.status !== 'rejected') {
                     return this.showModal('Notice', 'Timesheet for this date has already been submitted and is locked.');
@@ -1133,11 +1150,13 @@
                             <select class="modal-roster-leave text-xs border border-slate-300 rounded px-2 py-1 outline-none ${isChecked ? 'hidden' : ''}" data-emp="${emp.id}">
                                 <option value="">Just Late/Waiting</option>
                                 <option value="Absent">Absent</option>
-                                <option value="Vacation Leave">Vacation Leave</option>
-                                <option value="Sick Leave">Sick Leave</option>
+                                <option value="Leave without pay">Leave without pay</option>
+                                <option value="Sick Pay">Sick Pay</option>
+                                <option value="Salary">Salary</option>
                                 <option value="Maternity Leave">Maternity Leave</option>
                                 <option value="Paternity Leave">Paternity Leave</option>
                                 <option value="Bereavement Leave">Bereavement Leave</option>
+                                <option value="Overtime">Overtime</option>
                             </select>
                         </label>
                     `;
@@ -1381,17 +1400,20 @@
 
                     html += `
                         <tr class="hover:bg-slate-50 border-b" id="row-${docId}">
+                            <td class="px-4 py-2 text-center"><input type="checkbox" class="bulk-edit-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" value="${emp.id}" data-docid="${docId}"></td>
                             <td class="px-4 py-2 font-medium">${emp.emp_id}</td>
                             <td class="px-4 py-2 text-sm">${emp.name}</td>
                             <td class="px-4 py-2">
                                 <select class="edit-leave border rounded px-1 py-0.5 w-24 text-xs bg-transparent disabled:opacity-75 disabled:border-transparent disabled:appearance-none" disabled>
                                     <option value="" ${!log.leave_type ? 'selected' : ''}>Present</option>
                                     <option value="Absent" ${log.leave_type === 'Absent' ? 'selected' : ''}>Absent</option>
-                                    <option value="Vacation Leave" ${log.leave_type === 'Vacation Leave' || log.leave_type === 'Leave' ? 'selected' : ''}>Vacation Leave</option>
-                                    <option value="Sick Leave" ${log.leave_type === 'Sick Leave' || log.leave_type === 'Sick' ? 'selected' : ''}>Sick Leave</option>
+                                    <option value="Leave without pay" ${log.leave_type === 'Leave without pay' ? 'selected' : ''}>Leave without pay</option>
+                                    <option value="Sick Pay" ${log.leave_type === 'Sick Pay' ? 'selected' : ''}>Sick Pay</option>
+                                    <option value="Salary" ${log.leave_type === 'Salary' ? 'selected' : ''}>Salary</option>
                                     <option value="Maternity Leave" ${log.leave_type === 'Maternity Leave' || log.leave_type === 'Maternity' ? 'selected' : ''}>Maternity Leave</option>
                                     <option value="Paternity Leave" ${log.leave_type === 'Paternity Leave' || log.leave_type === 'Paternity' ? 'selected' : ''}>Paternity Leave</option>
                                     <option value="Bereavement Leave" ${log.leave_type === 'Bereavement Leave' || log.leave_type === 'Bereavement' ? 'selected' : ''}>Bereavement Leave</option>
+                                    <option value="Overtime" ${log.leave_type === 'Overtime' ? 'selected' : ''}>Overtime</option>
                                 </select>
                             </td>
                             <td class="px-4 py-2"><input type="time" class="edit-in border rounded px-1 py-0.5 w-24 text-sm bg-transparent disabled:opacity-75 disabled:border-transparent" value="${log.am_in}" disabled></td>
@@ -1514,6 +1536,112 @@
                     btnSave.innerText = origText;
                     btnSave.disabled = false;
                 }
+            },
+
+            toggleBulkEditSelectAll(checkbox) {
+                const checkboxes = document.querySelectorAll('.bulk-edit-checkbox');
+                checkboxes.forEach(cb => cb.checked = checkbox.checked);
+            },
+
+            openBulkEditTimeModal() {
+                const checked = Array.from(document.querySelectorAll('.bulk-edit-checkbox:checked'));
+                if (checked.length === 0) {
+                    return this.showModal('Notice', 'Please select at least one employee to bulk edit.');
+                }
+
+                const targetDateStr = this.getTimesheetDateStr();
+                const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
+                if (existingSubmission && existingSubmission.status !== 'rejected' && this.profile.role === 'tk') {
+                    return this.showModal('Notice', 'Timesheet for this date has already been submitted and is locked.');
+                }
+
+                const html = `
+                    <div class="space-y-4">
+                        <p class="text-sm text-slate-600">You are about to edit the time for <strong>${checked.length}</strong> selected employee(s).</p>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Select Field to Edit</label>
+                            <select id="bulk-edit-field" class="w-full border border-slate-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="am_in">AM IN</option>
+                                <option value="am_out">AM OUT</option>
+                                <option value="pm_in">PM IN</option>
+                                <option value="pm_out">PM OUT</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">New Time Value</label>
+                            <input type="time" id="bulk-edit-time-val" class="w-full border border-slate-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
+                            <p class="text-xs text-slate-500 mt-1">Leave blank to clear the time.</p>
+                        </div>
+                    </div>
+                `;
+
+                this.showFormModal('Bulk Edit Time', html, async () => {
+                    const field = document.getElementById('bulk-edit-field').value;
+                    const timeVal = document.getElementById('bulk-edit-time-val').value;
+
+                    const submitBtn = document.getElementById('btn-modal-confirm');
+                    const origText = submitBtn.innerText;
+                    submitBtn.innerHTML = `<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                    submitBtn.disabled = true;
+
+                    try {
+                        const batch = writeBatch(db);
+                        let count = 0;
+                        checked.forEach(cb => {
+                            const empId = cb.value;
+                            const docId = cb.getAttribute('data-docid');
+                            const ref = docPath('timesheets', docId);
+                            
+                            const existingLog = this.timesheets.find(t => t.id === docId);
+                            
+                            if (existingLog) {
+                                // Calculate new total hours
+                                let ai = existingLog.am_in || '';
+                                let ao = existingLog.am_out || '';
+                                let pi = existingLog.pm_in || '';
+                                let po = existingLog.pm_out || '';
+                                
+                                if (field === 'am_in') ai = timeVal;
+                                if (field === 'am_out') ao = timeVal;
+                                if (field === 'pm_in') pi = timeVal;
+                                if (field === 'pm_out') po = timeVal;
+
+                                const total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
+
+                                batch.update(ref, { [field]: timeVal, total_hrs: total, updated_at: Date.now() });
+                            } else {
+                                const emp = this.employees.find(e => e.id === empId);
+                                const newLog = {
+                                    project_id: this.activeProjectId,
+                                    emp_id: empId,
+                                    date: targetDateStr,
+                                    am_in: '', am_out: '', pm_in: '', pm_out: '',
+                                    cost_code_used: emp ? (emp.cost_code_1 || '') : '',
+                                    leave_type: '',
+                                    total_hrs: 0,
+                                    created_at: Date.now(),
+                                    updated_at: Date.now()
+                                };
+                                newLog[field] = timeVal;
+                                batch.set(ref, newLog);
+                            }
+                            count++;
+                        });
+
+                        await batch.commit();
+                        this.hideModal();
+                        this.showToast(`Successfully updated ${count} records.`);
+                        
+                        const selectAll = document.getElementById('bulk-edit-select-all');
+                        if (selectAll) selectAll.checked = false;
+                        
+                    } catch (e) {
+                        console.error(e);
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                        this.showModal('Error', 'Failed to save bulk edit.');
+                    }
+                });
             },
 
             calculateHours(inStr, outStr) {
@@ -1678,9 +1806,10 @@
                     return;
                 }
 
+                let html = '';
                 emps.forEach(e => {
                     const proj = this.projects.find(p => p.id === e.project_id);
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 transition border-b">
                             <td class="px-4 py-3 text-center"><input type="checkbox" class="admin-roster-chk w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" value="${e.id}" onchange="app.updateAdminRosterSelection()"></td>
                             <td class="px-4 py-3 text-slate-700 max-w-[150px] truncate">${proj ? proj.name : 'Unknown Project'}</td>
@@ -1696,6 +1825,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
                 
                 this.updateAdminRosterSelection();
             },
@@ -1766,14 +1896,14 @@
 
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
-                let csv = 'Project,Emp ID,Name,Category,Type,Payroll Item,Cost Code 1,Cost Code 2,Rounding Class\n';
+                let csv = 'Project,Emp ID,Name,Category,Type,Cost Code 1,Cost Code 2,Rounding Class\n';
                 emps.forEach(e => {
                     const proj = this.projects.find(p => p.id === e.project_id);
                     const pName = proj ? proj.name.replace(/"/g, '""') : 'Unknown';
                     const name = e.name ? e.name.replace(/"/g, '""') : '';
                     const cat = e.job_category ? e.job_category.replace(/"/g, '""') : '';
                     
-                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.payroll_item || 'Hourly'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}","${e.rounding_class || 'Rounding'}"\n`;
+                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}","${e.rounding_class || 'Rounding'}"\n`;
                 });
 
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1824,15 +1954,6 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase">Payroll Item</label>
-                            <select id="fe-payroll" class="w-full px-3 py-2 border rounded outline-none mt-1">
-                                <option value="Hourly" ${emp.payroll_item==='Hourly'?'selected':''}>Hourly</option>
-                                <option value="Salary" ${emp.payroll_item==='Salary'?'selected':''}>Salary</option>
-                                <option value="Overtime" ${emp.payroll_item==='Overtime'?'selected':''}>Overtime</option>
-                                <option value="Sick Pay" ${emp.payroll_item==='Sick Pay'?'selected':''}>Sick Pay</option>
-                            </select>
-                        </div>
-                        <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase">Primary Cost Code</label>
                             <input type="text" id="fe-cc1" value="${emp.cost_code_1}" class="w-full px-3 py-2 border rounded outline-none mt-1">
                         </div>
@@ -1860,7 +1981,6 @@
                             job_category: document.getElementById('fe-cat').value.trim(),
                             type: document.getElementById('fe-type').value,
                             rounding_class: document.getElementById('fe-round').value,
-                            payroll_item: document.getElementById('fe-payroll').value,
                             cost_code_1: document.getElementById('fe-cc1').value.trim(),
                             cost_code_2: document.getElementById('fe-cc2').value.trim()
                         }, {merge:true});
@@ -1903,8 +2023,9 @@
                     return;
                 }
 
+                let html = '';
                 this.projects.forEach(p => {
-                    c.innerHTML += `
+                    html += `
                         <div class="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col relative">
                             <h4 class="font-bold text-slate-800 text-lg">${p.name}</h4>
                             <p class="text-xs text-slate-500 mb-3">Project #: ${p.number}</p>
@@ -1914,6 +2035,7 @@
                         </div>
                     `;
                 });
+                c.innerHTML = html;
             },
 
             editProject(id) {
@@ -2001,8 +2123,8 @@
                             const cols = chunk[i].map(c => String(c || '').trim());
                             if(cols.length < 3) continue; // Minimum required: Project, ID, Name
                             
-                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, Payroll Item, PRIMARY CC, SECONDARY CC, ROUNDING CLASS
-                            const [pName, eId, eName, jobCat, typeRaw, payrollRaw, cc1, cc2, roundClassRaw] = cols;
+                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC, ROUNDING CLASS
+                            const [pName, eId, eName, jobCat, typeRaw, cc1, cc2, roundClassRaw] = cols;
                             if(!pName || !eName || !eId) continue;
 
                             let type = 'Regular';
@@ -2010,14 +2132,6 @@
                                 const tL = typeRaw.toLowerCase();
                                 if(tL.includes('local')) type = 'Local';
                                 else if(tL.includes('other')) type = 'Other Location';
-                            }
-
-                            let payrollItem = 'Hourly';
-                            if(payrollRaw) {
-                                const pL = payrollRaw.toLowerCase();
-                                if(pL.includes('salary')) payrollItem = 'Salary';
-                                else if(pL.includes('overtime')) payrollItem = 'Overtime';
-                                else if(pL.includes('sick')) payrollItem = 'Sick Pay';
                             }
 
                             let roundingClass = 'Rounding';
@@ -2056,7 +2170,7 @@
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
                                 project_id: projId, emp_id: eId, name: eName, 
-                                job_category: jobCat || '', type: type, payroll_item: payrollItem, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
+                                job_category: jobCat || '', type: type, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
                             }, {merge: true});
                             hasWrites = true;
                         }
@@ -2285,28 +2399,9 @@
 
                 let finalPagesHTML = '';
 
-                // 1. Process "Regular" (Max 27 rows per page, chunked PER category)
-                const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location'));
-                const categories = [...new Set(regularEmps.map(e => e.job_category || 'UNASSIGNED'))];
+                // 1. Process "Regular" (Max 27 rows per page, combined categories)
+                const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location')).sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
                 
-                categories.forEach(cat => {
-                    const catEmps = regularEmps.filter(e => (e.job_category || 'UNASSIGNED') === cat);
-                    const chunks = this.chunkArray(catEmps, 26);
-                    chunks.forEach((chunk, chunkIdx) => {
-                        let catTitle = chunkIdx === 0 ? cat : `${cat} (Continued)`;
-                        let rows = `<tr><td colspan="10" class="job-category-row">${catTitle}</td></tr>`;
-                        let rowCount = 1;
-                        chunk.forEach((emp, idx) => {
-                            rows += this.generateEmployeePrintRow(emp, idx + 1 + (chunkIdx * 26), getLog(emp.id), absentIds);
-                            rowCount++;
-                        });
-                        for (let i = rowCount; i < 27; i++) {
-                            rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-                        }
-                        finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
-                    });
-                });
-
                 const processCombinedCategories = (empList) => {
                     if (empList.length === 0) return;
                     
@@ -2347,6 +2442,8 @@
                     if (rowCount > 0) flushPage();
                 };
 
+                processCombinedCategories(regularEmps);
+
                 // 2. Process "Local"
                 const localEmps = emps.filter(e => e.type === 'Local').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
                 processCombinedCategories(localEmps);
@@ -2366,19 +2463,20 @@
             // --- EXPORT & MISC ---
             getPayrollItem(emp, log) {
                 if (log.total_hrs > 0 || (log.am_in && log.am_out)) {
-                    return emp.payroll_item || 'Hourly';
+                    return 'Hourly';
                 }
                 if (log.leave_type) {
                     const lt = log.leave_type.toLowerCase();
                     if (lt.includes('sick')) return 'Sick Pay';
-                    if (lt.includes('absent')) return 'Leave without pay';
+                    if (lt.includes('absent') || lt.includes('without pay')) return 'Leave without pay';
                     if (lt.includes('maternity')) return 'Maternity Leave';
                     if (lt.includes('paternity')) return 'Paternity Leave';
                     if (lt.includes('bereavement')) return 'Bereavement Leave';
-                    if (lt === 'leave' || lt === 'vacation leave') return 'Vacation Leave';
+                    if (lt.includes('salary')) return 'Salary';
+                    if (lt.includes('overtime')) return 'Overtime';
                     return log.leave_type;
                 }
-                return emp.payroll_item || 'Hourly';
+                return 'Hourly';
             },
 
             exportPMData(isRounded) {
@@ -2389,7 +2487,7 @@
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
 
-                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Total Hours,Cost Code Used\n";
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Undertime Hours,Total Hours,Cost Code Used\n";
                 const proj = this.projects.find(p => p.id === this.activeProjectId) || {};
 
                 emps.forEach(emp => {
@@ -2408,9 +2506,12 @@
 
                     let regular = total;
                     let overtime = 0;
+                    let undertime = 0;
                     if (total > 8) {
                         regular = 8;
                         overtime = total - 8;
+                    } else if (total > 0 && total < 8) {
+                        undertime = 8 - total;
                     }
 
                     let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
@@ -2418,7 +2519,7 @@
 
                     const row = [
                         targetDateStr, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${pItem}"`, `"${log.leave_type||''}"`,
-                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
+                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(undertime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -2460,7 +2561,7 @@
             },
 
             generateCSV(logs, isRounded) {
-                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Total Hours,Cost Code Used\n";
+                let csvContent = "Date,Project Name,Employee ID,Employee Name,Category,Type,Payroll Item,Leave Type,AM IN,AM OUT,PM IN,PM OUT,Regular Hours,Overtime Hours,Undertime Hours,Total Hours,Cost Code Used\n";
 
                 logs.forEach(log => {
                     const emp = this.employees.find(e => e.id === log.emp_id) || {};
@@ -2478,9 +2579,12 @@
 
                     let regular = total;
                     let overtime = 0;
+                    let undertime = 0;
                     if (total > 8) {
                         regular = 8;
                         overtime = total - 8;
+                    } else if (total > 0 && total < 8) {
+                        undertime = 8 - total;
                     }
 
                     let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
@@ -2488,7 +2592,7 @@
 
                     const row = [
                         log.date, `"${proj.name||''}"`, `"${emp.emp_id||''}"`, `"${emp.name||''}"`, `"${emp.job_category||''}"`, `"${emp.type||''}"`, `"${pItem}"`, `"${log.leave_type||''}"`,
-                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
+                        ai, ao, pi, po, this.formatHoursToHHMM(regular), this.formatHoursToHHMM(overtime), this.formatHoursToHHMM(undertime), this.formatHoursToHHMM(total), `"${cleanCostCode}${log.cost_code_changed ? ' (Edited)' : ''}"`
                     ];
                     csvContent += row.join(',') + "\n";
                 });
@@ -2531,7 +2635,9 @@
 
             generateIIF(logs, isRounded) {
                 // Basic IIF header for Time Tracking
-                let iifContent = "!TIMEREC\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tNOTE\n";
+                let iifContent = "!TIMEREC\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tPROJ\tNOTE\tXFERTOPAYROLL\tBILLINGSTATUS\n";
+
+                const escapeIIF = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
 
                 logs.forEach(log => {
                     const emp = this.employees.find(e => e.id === log.emp_id) || {};
@@ -2549,9 +2655,12 @@
 
                     let regular = total;
                     let overtime = 0;
+                    let undertime = 0;
                     if (total > 8) {
                         regular = 8;
                         overtime = total - 8;
+                    } else if (total > 0 && total < 8) {
+                        undertime = 8 - total;
                     }
 
                     if (total > 0 || log.leave_type) {
@@ -2560,19 +2669,25 @@
                         const [yyyy, mm, dd] = dateStr.split('-');
                         const qbDate = (yyyy && mm && dd) ? `${mm}/${dd}/${yyyy}` : dateStr;
                         
-                        let cleanCostCode = (log.cost_code_used || '').replace(/[\s-]/g, '');
+                        // Ensure cost code is captured, fallback to employee's default if missing in log
+                        let rawCostCode = log.cost_code_used || emp.cost_code_1 || '';
+                        let cleanCostCode = rawCostCode.replace(/[\s-]/g, '');
                         let pItem = this.getPayrollItem(emp, log);
+                        let note = log.leave_type ? `Leave: ${log.leave_type}` : '';
 
                         if (regular > 0) {
                             const row = [
                                 "TIMEREC",
                                 qbDate,
-                                proj.name || '',
-                                emp.name || '',
-                                cleanCostCode,
-                                pItem, // PITEM
+                                escapeIIF(proj.name),
+                                escapeIIF(emp.name),
+                                "", // ITEM remains blank
+                                escapeIIF(pItem), // PITEM
                                 regular.toFixed(2),
-                                log.leave_type ? `Leave: ${log.leave_type}` : ''
+                                escapeIIF(cleanCostCode), // PROJ (Cost Code)
+                                escapeIIF(note),
+                                "N", // XFERTOPAYROLL
+                                "0"  // BILLINGSTATUS
                             ];
                             iifContent += row.join('\t') + "\n";
                         }
@@ -2581,26 +2696,49 @@
                             const rowOT = [
                                 "TIMEREC",
                                 qbDate,
-                                proj.name || '',
-                                emp.name || '',
-                                cleanCostCode,
-                                'Overtime', // PITEM for overtime
+                                escapeIIF(proj.name),
+                                escapeIIF(emp.name),
+                                "", // ITEM remains blank
+                                escapeIIF('Overtime'), // PITEM for overtime
                                 overtime.toFixed(2),
-                                log.leave_type ? `Leave: ${log.leave_type}` : ''
+                                escapeIIF(cleanCostCode),
+                                escapeIIF(note),
+                                "N", // XFERTOPAYROLL
+                                "0"  // BILLINGSTATUS
                             ];
                             iifContent += rowOT.join('\t') + "\n";
+                        }
+
+                        if (undertime > 0) {
+                            const rowUT = [
+                                "TIMEREC",
+                                qbDate,
+                                escapeIIF(proj.name),
+                                escapeIIF(emp.name),
+                                "", // ITEM remains blank
+                                escapeIIF('Hourly'), // PITEM for undertime
+                                undertime.toFixed(2),
+                                escapeIIF(cleanCostCode),
+                                escapeIIF(note),
+                                "N", // XFERTOPAYROLL
+                                "0"  // BILLINGSTATUS
+                            ];
+                            iifContent += rowUT.join('\t') + "\n";
                         }
                         
                         if (total === 0 && log.leave_type) {
                             const rowLeave = [
                                 "TIMEREC",
                                 qbDate,
-                                proj.name || '',
-                                emp.name || '',
-                                cleanCostCode,
-                                pItem,
+                                escapeIIF(proj.name),
+                                escapeIIF(emp.name),
+                                "", // ITEM remains blank
+                                escapeIIF(pItem),
                                 "0.00",
-                                `Leave: ${log.leave_type}`
+                                escapeIIF(cleanCostCode),
+                                escapeIIF(note),
+                                "N", // XFERTOPAYROLL
+                                "0"  // BILLINGSTATUS
                             ];
                             iifContent += rowLeave.join('\t') + "\n";
                         }
@@ -2615,10 +2753,14 @@
             },
 
             getFilteredRecords() {
-                let filtered = [...this.timesheets];
-                const pid = document.getElementById('filter-project')?.value;
                 const start = document.getElementById('filter-start')?.value;
                 const end = document.getElementById('filter-end')?.value;
+                
+                // Do not populate all data at first, wait for date range
+                if (!start || !end) return [];
+
+                let filtered = [...this.timesheets];
+                const pid = document.getElementById('filter-project')?.value;
                 if (pid) filtered = filtered.filter(r => r.project_id === pid);
                 if (start) filtered = filtered.filter(r => r.date >= start);
                 if (end) filtered = filtered.filter(r => r.date <= end);
@@ -2628,6 +2770,16 @@
             renderAllRecordsTable() {
                 const tbody = document.getElementById('all-records-body');
                 if(!tbody) return;
+                
+                const start = document.getElementById('filter-start')?.value;
+                const end = document.getElementById('filter-end')?.value;
+
+                if (!start || !end) {
+                    tbody.innerHTML = `<tr><td colspan="11" class="px-4 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Please select a date range to view records.</span></div></td></tr>`;
+                    document.getElementById('pagination-info').innerText = `Page 1 of 1 (Showing 0 records)`;
+                    return;
+                }
+
                 const records = this.getFilteredRecords();
                 const uniqueDates = [...new Set(records.map(r => r.date))];
                 const totalPages = Math.ceil(uniqueDates.length / this.daysPerPage) || 1;
@@ -2715,26 +2867,26 @@
                     const submitBtn = document.getElementById('btn-modal-confirm');
                     submitBtn.innerText = "Deleting..."; submitBtn.disabled = true;
                     
-                const chunks = this.chunkArray(recordsToDelete, 400);
-                for (const chunk of chunks) {
-                    const batch = writeBatch(db);
-                    chunk.forEach(rec => {
-                        // Deletes the timesheet
-                        batch.delete(docPath('timesheets', rec.id)); 
-                        
-                        // ADD THIS LINE: Also deletes the submission lock associated with it
-                        batch.delete(docPath('submissions', `${rec.project_id}_${rec.date}`));
-                    });
-                    
-                    // If "Erase ALL" is checked, let's also wipe orphaned submissions just in case
-                    if (eraseAll) {
-                        this.submissions.forEach(sub => {
-                            batch.delete(docPath('submissions', sub.id));
+                    const chunks = this.chunkArray(recordsToDelete, 200);
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(db);
+                        chunk.forEach(rec => {
+                            batch.delete(docPath('timesheets', rec.id));
+                            batch.delete(docPath('submissions', `${rec.project_id}_${rec.date}`));
                         });
+                        await batch.commit();
                     }
                     
-                    await batch.commit();
-                }
+                    if (eraseAll) {
+                        const subChunks = this.chunkArray(this.submissions, 400);
+                        for (const chunk of subChunks) {
+                            const batch = writeBatch(db);
+                            chunk.forEach(sub => {
+                                batch.delete(docPath('submissions', sub.id));
+                            });
+                            await batch.commit();
+                        }
+                    }
                     
                     this.hideModal(); this.showModal("Success", `${recordsToDelete.length} records have been permanently deleted.`);
                 } catch(e) {
@@ -2776,6 +2928,7 @@
                     return;
                 }
 
+                let html = '';
                 this.users.forEach(u => {
                     let assignedNames = 'All (Admin)';
                     if (u.role !== 'admin') {
@@ -2794,12 +2947,12 @@
                         roleDisplay += ` <span class="ml-2 bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] tracking-wide font-bold">+ DEMO</span>`;
                     }
                     
-                    tbody.innerHTML += `
+                    html += `
                         <tr class="hover:bg-slate-50 border-b">
                             <td class="px-6 py-4 font-medium">${u.name}</td>
                             <td class="px-6 py-4">${u.username}</td>
                             <td class="px-6 py-4 uppercase text-xs font-bold flex items-center">${roleDisplay}</td>
-                            <td class="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate" title="${assignedNames}">${assignedNames}</td>
+                            <td class="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate" title="${assignedNames.replace(/"/g, '&quot;')}">${assignedNames}</td>
                             <td class="px-6 py-4 text-right space-x-2">
                                 <button onclick="app.editUser('${u.username}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded text-xs font-bold border border-blue-200">EDIT</button>
                                 ${u.username !== 'admin' && u.username !== 'kate.catapang' ? `<button onclick="app.deleteUser('${u.username}')" class="text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1 rounded text-xs font-bold border border-rose-200">DEL</button>` : ''}
@@ -2807,6 +2960,7 @@
                         </tr>
                     `;
                 });
+                tbody.innerHTML = html;
             },
 
             editUser(username) {
