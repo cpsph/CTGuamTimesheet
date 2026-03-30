@@ -2641,7 +2641,7 @@
                 // Basic IIF header for Time Tracking
                 let iifContent = "!HDR\tPROD\tVER\tREL\tIIFVER\tDATE\tTIME\tACCNTNT\tAACNTNTSPLITTIME\n";
                 iifContent += `HDR\tQuickbooks Pro\tVersion 20.0D\tRelease R1\t1\t${exactDate}\t1671083281\tN\t0\n`;
-                iifContent += "!TIMEREC\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tPROJ\tNOTE\tXFERTOPAYROLL\tBILLINGSTATUS\n";
+                iifContent += "!TIMEACT\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tPROJ\tNOTE\tXFERTOPAYROLL\tBILLINGSTATUS\n";
 
                 const escapeIIF = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
 
@@ -2683,7 +2683,7 @@
 
                         if (regular > 0) {
                             const row = [
-                                "TIMEREC",
+                                "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
@@ -2700,7 +2700,7 @@
                         
                         if (overtime > 0) {
                             const rowOT = [
-                                "TIMEREC",
+                                "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
@@ -2717,7 +2717,7 @@
 
                         if (undertime > 0) {
                             const rowUT = [
-                                "TIMEREC",
+                                "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
@@ -2734,7 +2734,7 @@
                         
                         if (total === 0 && log.leave_type) {
                             const rowLeave = [
-                                "TIMEREC",
+                                "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
