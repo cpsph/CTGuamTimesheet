@@ -2839,7 +2839,9 @@
                         regular = 8;
                         overtime = total - 8;
                     } else if (total > 0 && total < 8) {
-                        undertime = 8 - total;
+                        if (log.leave_type) {
+                            undertime = 8 - total;
+                        }
                     }
 
                     if (total > 0) {
@@ -2894,13 +2896,23 @@
                         }
 
                         if (undertime > 0) {
+                            let utPItem = log.leave_type;
+                            const lt = log.leave_type.toLowerCase();
+                            if (lt.includes('sick')) utPItem = 'Sick Pay';
+                            else if (lt.includes('absent') || lt.includes('without pay')) utPItem = 'Leave without pay';
+                            else if (lt.includes('maternity')) utPItem = 'Maternity Leave';
+                            else if (lt.includes('paternity')) utPItem = 'Paternity Leave';
+                            else if (lt.includes('bereavement')) utPItem = 'Bereavement Leave';
+                            else if (lt.includes('salary')) utPItem = 'Salary';
+                            else if (lt.includes('overtime')) utPItem = 'Overtime';
+
                             const rowUT = [
                                 "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
                                 escapeIIF(itemCol), // ITEM
-                                escapeIIF('Hourly'), // PITEM for undertime
+                                escapeIIF(utPItem), // PITEM for undertime
                                 undertime.toFixed(2),
                                 escapeIIF(cleanCostCode),
                                 escapeIIF(note),
