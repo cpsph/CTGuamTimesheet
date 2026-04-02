@@ -1817,7 +1817,7 @@
                             <td class="px-4 py-3 font-medium">${e.emp_id}</td>
                             <td class="px-4 py-3 font-semibold text-slate-800">${e.name}</td>
                             <td class="px-4 py-3 text-slate-600">${e.job_category || '-'}</td>
-                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${e.type==='Regular'?'bg-blue-100 text-blue-700':(e.type==='Local'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700')}">${e.type || 'Regular'}</span></td>
+                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">${e.type || 'Regular'}</span></td>
                             <td class="px-4 py-3 text-xs font-mono text-slate-500">${e.cost_code_1||'-'} / ${e.cost_code_2||'-'}</td>
                             <td class="px-4 py-3 text-right space-x-2">
                                 <button onclick="app.editEmployee('${e.id}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded text-xs font-bold border border-blue-200">EDIT</button>
@@ -1941,11 +1941,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase">Type</label>
-                            <select id="fe-type" class="w-full px-3 py-2 border rounded outline-none mt-1">
-                                <option value="Regular" ${emp.type==='Regular'?'selected':''}>Regular</option>
-                                <option value="Local" ${emp.type==='Local'?'selected':''}>Local</option>
-                                <option value="Other Location" ${emp.type==='Other Location'?'selected':''}>Other Location</option>
-                            </select>
+                            <input type="text" id="fe-type" value="${emp.type || 'Regular'}" class="w-full px-3 py-2 border rounded outline-none mt-1">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase">Rounding Class</label>
@@ -2138,16 +2134,11 @@
                             const cols = chunk[i].map(c => String(c || '').trim());
                             if(cols.length < 3) continue; // Minimum required: Project, ID, Name
                             
-                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC, ROUNDING CLASS
-                            const [pName, eId, eName, jobCat, typeRaw, cc1, cc2, roundClassRaw] = cols;
+                            // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC, ROUNDING CLASS, NOTES
+                            const [pName, eId, eName, jobCat, typeRaw, cc1, cc2, roundClassRaw, notesRaw] = cols;
                             if(!pName || !eName || !eId) continue;
 
-                            let type = 'Regular';
-                            if(typeRaw) {
-                                const tL = typeRaw.toLowerCase();
-                                if(tL.includes('local')) type = 'Local';
-                                else if(tL.includes('other')) type = 'Other Location';
-                            }
+                            let type = typeRaw || 'Regular';
 
                             let roundingClass = 'Rounding';
                             if(roundClassRaw) {
@@ -2185,7 +2176,7 @@
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
                                 project_id: projId, emp_id: eId, name: eName, 
-                                job_category: jobCat || '', type: type, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || ''
+                                job_category: jobCat || '', type: type, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || '', notes: notesRaw || ''
                             }, {merge: true});
                             hasWrites = true;
                         }
@@ -2216,8 +2207,18 @@
                 const isAbsent = absentIds.includes(emp.id);
                 const sigContent = isAbsent ? '<span style="font-weight:bold; color:red;">ABSENT</span>' : '';
                 const cc = log.cost_code_used !== undefined ? log.cost_code_used : (emp.cost_code_1 || '');
+                
+                let displayHrs = log.total_hrs || 0;
+                if (log.leave_type) {
+                    const lt = log.leave_type.toLowerCase();
+                    if (lt.includes('sick') || lt.includes('maternity') || lt.includes('paternity') || lt.includes('bereavement') || lt.includes('salary')) {
+                        displayHrs = 8;
+                    }
+                }
+
                 return `
                     <tr>
+                        <td style="border:none; text-align:right; padding-right:5px; font-size:9px; vertical-align:middle; overflow:hidden;">${emp.notes || ''}</td>
                         <td>${num}</td>
                         <td>${emp.emp_id}</td>
                         <td>${cc}</td>
@@ -2226,7 +2227,7 @@
                         <td>${log.am_out||''}</td>
                         <td>${log.pm_in||''}</td>
                         <td>${log.pm_out||''}</td>
-                        <td>${(log.total_hrs||0).toFixed(2)}</td>
+                        <td>${displayHrs.toFixed(2)}</td>
                         <td>${sigContent}</td> <!-- EE SIGNATURE -->
                     </tr>
                 `;
@@ -2260,6 +2261,7 @@
                         <table class="print-table">
                             <thead>
                                 <tr>
+                                    <th rowspan="2" style="width:60px; border:none;"></th>
                                     <th rowspan="2" style="width:30px;">NO</th>
                                     <th rowspan="2" style="width:60px;">Employee<br>ID</th>
                                     <th rowspan="2" style="width:80px;">COST CODE</th>
@@ -2416,8 +2418,8 @@
 
                 let pagesData = [];
 
-                // 1. Process "Regular" (Max 27 rows per page, combined categories)
-                const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location')).sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
+                // Group employees by type
+                const types = [...new Set(emps.map(e => e.type || 'Regular'))].sort();
                 
                 const processCombinedCategories = (empList) => {
                     if (empList.length === 0) return;
@@ -2429,7 +2431,7 @@
 
                     const flushPage = () => {
                         for (let i = rowCount; i < 27; i++) {
-                            rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                            rows += `<tr><td style="border:none;"></td><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
                         }
                         pagesData.push(rows);
                         rows = '';
@@ -2442,13 +2444,13 @@
                         if (empCat !== currentCat) {
                             if (rowCount + 2 > 27) flushPage();
                             currentCat = empCat;
-                            rows += `<tr><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
+                            rows += `<tr><td style="border:none;"></td><td colspan="10" class="job-category-row">${currentCat}</td></tr>`;
                             rowCount++;
                             empIdx = 1;
                         } else {
                             if (rowCount + 1 > 27) {
                                 flushPage();
-                                rows += `<tr><td colspan="10" class="job-category-row">${currentCat} (Continued)</td></tr>`;
+                                rows += `<tr><td style="border:none;"></td><td colspan="10" class="job-category-row">${currentCat} (Continued)</td></tr>`;
                                 rowCount++;
                             }
                         }
@@ -2460,15 +2462,10 @@
                     if (rowCount > 0) flushPage();
                 };
 
-                processCombinedCategories(regularEmps);
-
-                // 2. Process "Local"
-                const localEmps = emps.filter(e => e.type === 'Local').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
-                processCombinedCategories(localEmps);
-
-                // 3. Process "Other Location"
-                const otherEmps = emps.filter(e => e.type === 'Other Location').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
-                processCombinedCategories(otherEmps);
+                types.forEach(type => {
+                    const typeEmps = emps.filter(e => (e.type || 'Regular') === type).sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
+                    processCombinedCategories(typeEmps);
+                });
 
                 if(pagesData.length === 0) {
                     return this.showModal('Notice', 'No employees exist to print for this project.');
@@ -2526,6 +2523,15 @@
                         pi = this.roundTime15m(pi); po = this.roundTime15m(po);
                         total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
                         total = Math.round(total * 4) / 4;
+                    }
+
+                    const paidLeaves = ['Salary', 'Sick Pay', 'Maternity Leave', 'Paternity Leave', 'Bereavement Leave', 'Maternity', 'Bereavement', 'Paternity'];
+                    const isPaidLeave = log.leave_type && paidLeaves.includes(log.leave_type);
+
+                    if (total === 0 && !isPaidLeave) return;
+
+                    if (total === 0 && isPaidLeave) {
+                        total = 8;
                     }
 
                     let regular = total;
@@ -2599,6 +2605,15 @@
                         pi = this.roundTime15m(pi); po = this.roundTime15m(po);
                         total = this.calculateHours(ai, ao) + this.calculateHours(pi, po);
                         total = Math.round(total * 4) / 4;
+                    }
+
+                    const paidLeaves = ['Salary', 'Sick Pay', 'Maternity Leave', 'Paternity Leave', 'Bereavement Leave', 'Maternity', 'Bereavement', 'Paternity'];
+                    const isPaidLeave = log.leave_type && paidLeaves.includes(log.leave_type);
+
+                    if (total === 0 && !isPaidLeave) return;
+
+                    if (total === 0 && isPaidLeave) {
+                        total = 8;
                     }
 
                     let regular = total;
@@ -2835,6 +2850,11 @@
                         else if (sub.status === 'rejected') statusBadge = '<span class="px-2 py-0.5 bg-rose-100 text-rose-800 rounded text-[10px] font-bold uppercase">Rejected</span>';
                     }
 
+                    const paidLeaves = ['Salary', 'Sick Pay', 'Maternity Leave', 'Paternity Leave', 'Bereavement Leave', 'Maternity', 'Bereavement', 'Paternity'];
+                    const isPaidLeave = r.leave_type && paidLeaves.includes(r.leave_type);
+                    let displayHrs = r.total_hrs || 0;
+                    if (displayHrs === 0 && isPaidLeave) displayHrs = 8;
+
                     html += `
                         <tr class="hover:bg-slate-50 transition border-b">
                             <td class="px-4 py-3 text-slate-600 truncate max-w-[150px]">${proj.name || 'Unknown'}</td>
@@ -2847,7 +2867,7 @@
                             <td class="px-4 py-3">${r.pm_in || '-'}</td>
                             <td class="px-4 py-3">${r.pm_out || '-'}</td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">${r.cost_code_used || '-'}${r.cost_code_changed ? ' <span class="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-bold" title="Manually changed by PM">EDITED</span>' : ''}</td>
-                            <td class="px-4 py-3 font-semibold text-slate-800">${(r.total_hrs || 0).toFixed(2)}</td>
+                            <td class="px-4 py-3 font-semibold text-slate-800">${displayHrs.toFixed(2)}</td>
                         </tr>
                     `;
                 });
