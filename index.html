@@ -32,7 +32,7 @@
             .print-table tr { page-break-inside: avoid; }
             .print-table th, .print-table td { border: 1px solid black; padding: 2px; text-align: center; height: 20px; }
             .print-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
-            .print-logo-box { width: 80px; height: 40px; border: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .print-logo-box { width: 150px; height: 75px; border: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
             .print-company-info { text-align: center; flex-grow: 1; font-size: 11px; line-height: 1.2; }
             .print-title { text-align: center; font-weight: bold; font-size: 14px; margin: 10px 0; text-decoration: underline; }
             .print-meta { margin-bottom: 5px; font-size: 11px; }
@@ -2040,18 +2040,32 @@
             },
 
             editProject(id) {
-                const p = id ? this.projects.find(x=>x.id===id) : {name:'', number:'', lat:'', lng:''};
+                const p = id ? this.projects.find(x=>x.id===id) : {name:'', number:'', lat:'', lng:'', enable_service_item: false, service_item_text: ''};
                 this.showFormModal(id ? 'Edit Project' : 'New Project', `
                     <input type="text" id="fp-name" placeholder="Project Name" value="${p.name}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
                     <input type="text" id="fp-num" placeholder="Project Number (Optional)" value="${p.number}" class="w-full px-3 py-2 border rounded mb-3 outline-none">
-                    <div class="flex gap-3 mb-1">
+                    <div class="flex gap-3 mb-3">
                         <input type="text" id="fp-lat" placeholder="Latitude (Optional)" value="${p.lat}" class="w-1/2 px-3 py-2 border rounded outline-none">
                         <input type="text" id="fp-lng" placeholder="Longitude (Optional)" value="${p.lng}" class="w-1/2 px-3 py-2 border rounded outline-none">
                     </div>
+                    <div class="border-t pt-3 mt-2">
+                        <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                            <input type="checkbox" id="fp-enable-service" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" ${p.enable_service_item ? 'checked' : ''} onchange="document.getElementById('fp-service-text-container').style.display = this.checked ? 'block' : 'none'">
+                            <span class="text-sm font-medium text-slate-700">Enable SERVICE ITEM for IIF Export</span>
+                        </label>
+                        <div id="fp-service-text-container" style="display: ${p.enable_service_item ? 'block' : 'none'};">
+                            <input type="text" id="fp-service-text" placeholder="Service Item Text (e.g. C1329 Replace Andersen Housing:)" value="${p.service_item_text || ''}" class="w-full px-3 py-2 border rounded outline-none text-sm">
+                            <p class="text-xs text-slate-500 mt-1">Cost code will be appended automatically.</p>
+                        </div>
+                    </div>
                 `, async () => {
                     const data = {
-                        name: document.getElementById('fp-name').value, number: document.getElementById('fp-num').value,
-                        lat: document.getElementById('fp-lat').value, lng: document.getElementById('fp-lng').value
+                        name: document.getElementById('fp-name').value, 
+                        number: document.getElementById('fp-num').value,
+                        lat: document.getElementById('fp-lat').value, 
+                        lng: document.getElementById('fp-lng').value,
+                        enable_service_item: document.getElementById('fp-enable-service').checked,
+                        service_item_text: document.getElementById('fp-service-text').value
                     };
                     if(!data.name) return;
 
@@ -2218,7 +2232,7 @@
                 `;
             },
 
-            createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rowsHTML) {
+            createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rowsHTML, pageNum, totalPages) {
                 return `
                 <div class="print-page">
                     <div class="print-content">
@@ -2230,7 +2244,9 @@
                                 <strong>${compName}</strong><br>
                                 <div style="white-space: pre-wrap;">${compAddr}</div>
                             </div>
-                            <div style="width:80px;"></div> <!-- Spacer -->
+                            <div style="width:150px; text-align: right; font-size: 10px; font-weight: bold;">
+                                Page ${pageNum} of ${totalPages}
+                            </div>
                         </div>
                         
                         <div class="print-meta">
@@ -2398,7 +2414,7 @@
 
                 const getLog = (empId) => this.timesheets.find(t => t.id === `${empId}_${todayStr}`) || { am_in:'', am_out:'', pm_in:'', pm_out:'', total_hrs:0 };
 
-                let finalPagesHTML = '';
+                let pagesData = [];
 
                 // 1. Process "Regular" (Max 27 rows per page, combined categories)
                 const regularEmps = emps.filter(e => e.type === 'Regular' || !e.type || (e.type !== 'Local' && e.type !== 'Other Location')).sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
@@ -2415,7 +2431,7 @@
                         for (let i = rowCount; i < 27; i++) {
                             rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
                         }
-                        finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows);
+                        pagesData.push(rows);
                         rows = '';
                         rowCount = 0;
                     };
@@ -2453,9 +2469,15 @@
                 const otherEmps = emps.filter(e => e.type === 'Other Location').sort((a,b) => (a.job_category||'').localeCompare(b.job_category||''));
                 processCombinedCategories(otherEmps);
 
-                if(finalPagesHTML === '') {
+                if(pagesData.length === 0) {
                     return this.showModal('Notice', 'No employees exist to print for this project.');
                 }
+
+                let finalPagesHTML = '';
+                const totalPages = pagesData.length;
+                pagesData.forEach((rows, index) => {
+                    finalPagesHTML += this.createPrintPageHTML(proj, compName, compAddr, compLogo, todayStr, rows, index + 1, totalPages);
+                });
 
                 pa.innerHTML = finalPagesHTML;
                 setTimeout(() => window.print(), 300); // slight delay to ensure images render
@@ -2692,6 +2714,11 @@
                         let cleanCostCode = rawCostCode.replace(/[\s-]/g, '');
                         let pItem = this.getPayrollItem(emp, log);
                         let note = log.leave_type ? `Leave: ${log.leave_type}` : '';
+                        
+                        let itemCol = "";
+                        if (proj.enable_service_item && proj.service_item_text) {
+                            itemCol = `${proj.service_item_text}${cleanCostCode}`;
+                        }
 
                         if (regular > 0) {
                             const row = [
@@ -2699,7 +2726,7 @@
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
-                                "", // ITEM remains blank
+                                escapeIIF(itemCol), // ITEM
                                 escapeIIF(pItem), // PITEM
                                 regular.toFixed(2),
                                 escapeIIF(cleanCostCode), // PROJ (Cost Code)
@@ -2716,7 +2743,7 @@
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
-                                "", // ITEM remains blank
+                                escapeIIF(itemCol), // ITEM
                                 escapeIIF('Overtime'), // PITEM for overtime
                                 overtime.toFixed(2),
                                 escapeIIF(cleanCostCode),
@@ -2733,7 +2760,7 @@
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
-                                "", // ITEM remains blank
+                                escapeIIF(itemCol), // ITEM
                                 escapeIIF('Hourly'), // PITEM for undertime
                                 undertime.toFixed(2),
                                 escapeIIF(cleanCostCode),
