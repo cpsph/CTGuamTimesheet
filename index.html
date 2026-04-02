@@ -1189,10 +1189,11 @@
 
                 let pmOutTimeHtml = '';
                 if (type === 'PM_OUT') {
+                    const nowTime = this.getRealTime().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Guam'});
                     pmOutTimeHtml = `
                         <div class="mb-4 p-3 bg-slate-100 rounded border border-slate-300 flex items-center justify-between">
                             <label class="text-sm font-bold text-slate-700">Set PM OUT Time (Guam Time):</label>
-                            <input type="time" id="modal-pm-out-time" value="16:00" class="border border-slate-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="time" id="modal-pm-out-time" value="${nowTime}" class="border border-slate-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                     `;
                 }
@@ -2827,18 +2828,21 @@
                     // Skip if no time record and not a paid leave
                     if (total === 0 && !isPaidLeave) return;
 
+                    let isFullDayLeave = false;
+
                     // Paid leaves without time records get 8 hours
                     if (total === 0 && isPaidLeave) {
                         total = 8;
+                        isFullDayLeave = true;
                     }
 
                     let regular = total;
                     let overtime = 0;
                     let undertime = 0;
-                    if (total > 8) {
+                    if (total > 8 && !isFullDayLeave) {
                         regular = 8;
                         overtime = total - 8;
-                    } else if (total > 0 && total < 8) {
+                    } else if (total > 0 && total < 8 && !isFullDayLeave) {
                         if (log.leave_type) {
                             undertime = 8 - total;
                         }
@@ -2853,7 +2857,21 @@
                         // Ensure cost code is captured, fallback to employee's default if missing in log
                         let rawCostCode = log.cost_code_used || emp.cost_code_1 || '';
                         let cleanCostCode = rawCostCode.replace(/[\s-]/g, '');
-                        let pItem = this.getPayrollItem(emp, log);
+                        
+                        let normalPItem = emp.type === 'Salary' ? 'Salary' : 'Hourly';
+                        let leavePItem = normalPItem;
+                        if (log.leave_type) {
+                            const lt = log.leave_type.toLowerCase();
+                            if (lt.includes('sick')) leavePItem = 'Sick Pay';
+                            else if (lt.includes('absent') || lt.includes('without pay')) leavePItem = 'Leave without pay';
+                            else if (lt.includes('maternity')) leavePItem = 'Maternity Leave';
+                            else if (lt.includes('paternity')) leavePItem = 'Paternity Leave';
+                            else if (lt.includes('bereavement')) leavePItem = 'Bereavement Leave';
+                            else if (lt.includes('salary')) leavePItem = 'Salary';
+                            else if (lt.includes('overtime')) leavePItem = 'Overtime';
+                            else leavePItem = log.leave_type;
+                        }
+
                         let note = log.leave_type ? `Leave: ${log.leave_type}` : '';
                         
                         let itemCol = "";
@@ -2862,16 +2880,19 @@
                         }
 
                         if (regular > 0) {
+                            let currentPItem = isFullDayLeave ? leavePItem : normalPItem;
+                            let currentNote = isFullDayLeave ? note : "";
+                            
                             const row = [
                                 "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
                                 escapeIIF(itemCol), // ITEM
-                                escapeIIF(pItem), // PITEM
+                                escapeIIF(currentPItem), // PITEM
                                 regular.toFixed(2),
                                 escapeIIF(cleanCostCode), // PROJ (Cost Code)
-                                escapeIIF(note),
+                                escapeIIF(currentNote),
                                 "N", // XFERTOPAYROLL
                                 "0"  // BILLINGSTATUS
                             ];
@@ -2888,7 +2909,7 @@
                                 escapeIIF('Overtime'), // PITEM for overtime
                                 overtime.toFixed(2),
                                 escapeIIF(cleanCostCode),
-                                escapeIIF(note),
+                                escapeIIF(""),
                                 "N", // XFERTOPAYROLL
                                 "0"  // BILLINGSTATUS
                             ];
@@ -2896,23 +2917,13 @@
                         }
 
                         if (undertime > 0) {
-                            let utPItem = log.leave_type;
-                            const lt = log.leave_type.toLowerCase();
-                            if (lt.includes('sick')) utPItem = 'Sick Pay';
-                            else if (lt.includes('absent') || lt.includes('without pay')) utPItem = 'Leave without pay';
-                            else if (lt.includes('maternity')) utPItem = 'Maternity Leave';
-                            else if (lt.includes('paternity')) utPItem = 'Paternity Leave';
-                            else if (lt.includes('bereavement')) utPItem = 'Bereavement Leave';
-                            else if (lt.includes('salary')) utPItem = 'Salary';
-                            else if (lt.includes('overtime')) utPItem = 'Overtime';
-
                             const rowUT = [
                                 "TIMEACT",
                                 qbDate,
                                 escapeIIF(proj.name),
                                 escapeIIF(emp.name),
                                 escapeIIF(itemCol), // ITEM
-                                escapeIIF(utPItem), // PITEM for undertime
+                                escapeIIF(leavePItem), // PITEM for undertime
                                 undertime.toFixed(2),
                                 escapeIIF(cleanCostCode),
                                 escapeIIF(note),
