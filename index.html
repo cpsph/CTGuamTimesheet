@@ -325,6 +325,7 @@
                         <div>
                             <h3 class="font-bold text-blue-800">Employee Masterlist</h3>
                             <p class="text-xs text-blue-600 mt-1">Manage project assignments, types, and cost codes.</p>
+                            <p class="text-xs text-blue-700 mt-1 font-medium bg-blue-100 inline-block px-2 py-0.5 rounded" id="admin-roster-summary"></p>
                         </div>
                         <div class="flex flex-wrap gap-2 justify-end">
                             <button onclick="app.exportAdminRoster()" class="bg-emerald-600 text-white px-3 py-1.5 rounded shadow-sm hover:bg-emerald-700 transition text-sm flex items-center font-medium">
@@ -789,6 +790,7 @@
                 }));
                 this.unsubs.push(onSnapshot(collPath('employees'), snap => {
                     this.employees = []; snap.forEach(d => this.employees.push({id: d.id, ...d.data()}));
+                    this.populateProjectSelects();
                     if(this.activeProjectId) this.renderRoster();
                     if(this.profile.role === 'admin') this.debouncedRenderAdminRoster();
                 }));
@@ -936,11 +938,25 @@
                     allowedProjects = this.projects.filter(p => assigned.includes(p.id));
                 }
 
-                const opts = `<option value="">-- ${this.profile?.role === 'admin' ? 'All / Select Project' : 'Select Project'} --</option>` + allowedProjects.map(p => `<option value="${p.id}">${p.name} (${p.number})</option>`).join('');
+                const counts = {};
+                this.employees.forEach(e => {
+                    counts[e.project_id] = (counts[e.project_id] || 0) + 1;
+                });
+
+                const opts = `<option value="">-- ${this.profile?.role === 'admin' ? 'All / Select Project' : 'Select Project'} --</option>` + allowedProjects.map(p => {
+                    const count = counts[p.id] || 0;
+                    return `<option value="${p.id}">${p.name} (${p.number}) - ${count} employees</option>`;
+                }).join('');
                 
-                if(pSel && !this.activeProjectId) pSel.innerHTML = opts;
-                if(fSel) fSel.innerHTML = opts;
-                if(rSel && rSel.options.length <= 1) rSel.innerHTML = opts;
+                if(pSel && !this.activeProjectId) {
+                    const val = pSel.value; pSel.innerHTML = opts; pSel.value = val;
+                }
+                if(fSel) {
+                    const val = fSel.value; fSel.innerHTML = opts; fSel.value = val;
+                }
+                if(rSel) {
+                    const val = rSel.value; rSel.innerHTML = opts; rSel.value = val;
+                }
             },
 
             async validateGPS() {
@@ -1797,7 +1813,31 @@
                 
                 const filterPid = document.getElementById('admin-roster-project-filter')?.value;
                 let emps = this.employees;
-                if(filterPid) emps = emps.filter(e => e.project_id === filterPid);
+                
+                const totalEmps = this.employees.length;
+                let summaryText = `Total Employees: ${totalEmps} across all projects`;
+
+                if(filterPid) {
+                    emps = emps.filter(e => e.project_id === filterPid);
+                    const proj = this.projects.find(p => p.id === filterPid);
+                    const projName = proj ? proj.name : 'Selected Project';
+                    summaryText = `Showing ${emps.length} employees for ${projName} (out of ${totalEmps} total)`;
+                } else {
+                    const counts = {};
+                    this.employees.forEach(e => {
+                        counts[e.project_id] = (counts[e.project_id] || 0) + 1;
+                    });
+                    const breakdown = Object.entries(counts).map(([pid, count]) => {
+                        const p = this.projects.find(proj => proj.id === pid);
+                        return p ? `${p.name}: ${count}` : `Unknown: ${count}`;
+                    }).join(' | ');
+                    if (breakdown) {
+                        summaryText += ` — Breakdown: ${breakdown}`;
+                    }
+                }
+
+                const summaryEl = document.getElementById('admin-roster-summary');
+                if (summaryEl) summaryEl.innerText = summaryText;
 
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
@@ -2124,6 +2164,9 @@
                     // Skip header row and chunk the data to avoid Firestore 500 write limit
                     const chunks = this.chunkArray(rows.slice(1), 400);
                     
+                    let processedCount = 0;
+                    let skippedCount = 0;
+
                     for (const chunk of chunks) {
                         const batch = writeBatch(db);
                         let hasWrites = false;
@@ -2132,11 +2175,14 @@
                             if (!Array.isArray(chunk[i])) continue;
                             // Ensure all columns are cast to strings and trimmed
                             const cols = chunk[i].map(c => String(c || '').trim());
-                            if(cols.length < 3) continue; // Minimum required: Project, ID, Name
+                            const hasData = cols.some(c => c !== '');
+                            if (!hasData) continue; // Ignore completely empty rows
+
+                            if(cols.length < 3) { skippedCount++; continue; } // Minimum required: Project, ID, Name
                             
                             // Specific Format: Project Name, Employee ID, Employee Name, Category, Type, PRIMARY CC, SECONDARY CC, ROUNDING CLASS, NOTES
                             const [pName, eId, eName, jobCat, typeRaw, cc1, cc2, roundClassRaw, notesRaw] = cols;
-                            if(!pName || !eName || !eId) continue;
+                            if(!pName || !eName || !eId) { skippedCount++; continue; }
 
                             let type = typeRaw || 'Regular';
 
@@ -2153,7 +2199,7 @@
                                 else {
                                     // PMs can't create new projects via upload
                                     if (this.profile.role !== 'admin') {
-                                        continue; // Skip this row
+                                        skippedCount++; continue; // Skip this row
                                     }
                                     const newPref = doc(collPath('projects'));
                                     projId = newPref.id;
@@ -2167,18 +2213,19 @@
                             // If PM, check if they are assigned to this project
                             if (this.profile.role !== 'admin') {
                                 if (!this.profile.assigned_projects || !this.profile.assigned_projects.includes(projId)) {
-                                    continue; // Skip this row
+                                    skippedCount++; continue; // Skip this row
                                 }
                             }
 
                             const safeEmpId = eId.replace(/\W/g, ''); 
-                            if (!safeEmpId) continue;
+                            if (!safeEmpId) { skippedCount++; continue; }
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
                                 project_id: projId, emp_id: eId, name: eName, 
                                 job_category: jobCat || '', type: type, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || '', notes: notesRaw || ''
                             }, {merge: true});
                             hasWrites = true;
+                            processedCount++;
                         }
 
                         if (hasWrites) {
@@ -2187,7 +2234,11 @@
                     }
 
                     this.hideModal();
-                    this.showModal('Success', 'Roster Data successfully imported and synchronized from Excel/CSV.');
+                    let msg = `Successfully imported/updated ${processedCount} employees.`;
+                    if (skippedCount > 0) {
+                        msg += `<br><br><span class="text-amber-600 font-bold">Note: ${skippedCount} row(s) were skipped due to missing required data (Project Name, Employee ID, or Employee Name) or insufficient permissions.</span>`;
+                    }
+                    this.showModal('Import Complete', msg);
                 } catch(err) {
                     console.error(err);
                     this.showModal('Error', 'Failed to process file data.');
