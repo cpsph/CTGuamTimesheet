@@ -585,7 +585,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, writeBatch, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Config mapping
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -940,7 +940,10 @@
 
                 const counts = {};
                 this.employees.forEach(e => {
-                    counts[e.project_id] = (counts[e.project_id] || 0) + 1;
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    pids.forEach(pid => {
+                        counts[pid] = (counts[pid] || 0) + 1;
+                    });
                 });
 
                 const opts = `<option value="">-- ${this.profile?.role === 'admin' ? 'All / Select Project' : 'Select Project'} --</option>` + allowedProjects.map(p => {
@@ -1101,7 +1104,10 @@
                 const tbody = document.getElementById('roster-body');
                 tbody.innerHTML = '';
 
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId);
+                const emps = this.employees.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(this.activeProjectId);
+                });
                 if(emps.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-slate-500"><div class="flex flex-col items-center justify-center space-y-2"><svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg><span>No employees found for this project.</span></div></td></tr>`;
                     return;
@@ -1141,7 +1147,10 @@
                 }
                 
                 const typeLabels = { 'AM_IN': 'AM IN', 'AM_OUT': 'AM OUT', 'PM_IN': 'PM IN', 'PM_OUT': 'PM OUT' };
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                const emps = this.employees.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(this.activeProjectId);
+                }).sort((a,b) => a.name.localeCompare(b.name));
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
 
@@ -1365,7 +1374,10 @@
                 const tbody = document.getElementById('timesheet-edit-body');
                 tbody.innerHTML = '';
 
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                const emps = this.employees.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(this.activeProjectId);
+                }).sort((a,b) => a.name.localeCompare(b.name));
                 
                 const existingSubmission = this.submissions.find(s => s.project_id === this.activeProjectId && s.date === targetDateStr);
                 const isSubmitted = existingSubmission && existingSubmission.status !== 'rejected';
@@ -1818,14 +1830,20 @@
                 let summaryText = `Total Employees: ${totalEmps} across all projects`;
 
                 if(filterPid) {
-                    emps = emps.filter(e => e.project_id === filterPid);
+                    emps = emps.filter(e => {
+                        const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                        return pids.includes(filterPid);
+                    });
                     const proj = this.projects.find(p => p.id === filterPid);
                     const projName = proj ? proj.name : 'Selected Project';
                     summaryText = `Showing ${emps.length} employees for ${projName} (out of ${totalEmps} total)`;
                 } else {
                     const counts = {};
                     this.employees.forEach(e => {
-                        counts[e.project_id] = (counts[e.project_id] || 0) + 1;
+                        const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                        pids.forEach(pid => {
+                            counts[pid] = (counts[pid] || 0) + 1;
+                        });
                     });
                     const breakdown = Object.entries(counts).map(([pid, count]) => {
                         const p = this.projects.find(proj => proj.id === pid);
@@ -1849,11 +1867,15 @@
 
                 let html = '';
                 emps.forEach(e => {
-                    const proj = this.projects.find(p => p.id === e.project_id);
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    const projNames = pids.map(pid => {
+                        const p = this.projects.find(proj => proj.id === pid);
+                        return p ? p.name : 'Unknown';
+                    }).join(', ');
                     html += `
                         <tr class="hover:bg-slate-50 transition border-b">
                             <td class="px-4 py-3 text-center"><input type="checkbox" class="admin-roster-chk w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" value="${e.id}" onchange="app.updateAdminRosterSelection()"></td>
-                            <td class="px-4 py-3 text-slate-700 max-w-[150px] truncate">${proj ? proj.name : 'Unknown Project'}</td>
+                            <td class="px-4 py-3 text-slate-700 max-w-[150px] truncate">${projNames}</td>
                             <td class="px-4 py-3 font-medium">${e.emp_id}</td>
                             <td class="px-4 py-3 font-semibold text-slate-800">${e.name}</td>
                             <td class="px-4 py-3 text-slate-600">${e.job_category || '-'}</td>
@@ -1929,7 +1951,10 @@
             exportAdminRoster() {
                 const filterPid = document.getElementById('admin-roster-project-filter')?.value;
                 let emps = this.employees;
-                if(filterPid) emps = emps.filter(e => e.project_id === filterPid);
+                if(filterPid) emps = emps.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(filterPid);
+                });
 
                 if (emps.length === 0) {
                     return this.showModal('Notice', 'No employees to export.');
@@ -1937,14 +1962,17 @@
 
                 emps.sort((a,b) => a.name.localeCompare(b.name));
 
-                let csv = 'Project,Emp ID,Name,Category,Type,Cost Code 1,Cost Code 2,Rounding Class\n';
+                let csv = 'Project(s),Emp ID,Name,Category,Type,Cost Code 1,Cost Code 2,Rounding Class\n';
                 emps.forEach(e => {
-                    const proj = this.projects.find(p => p.id === e.project_id);
-                    const pName = proj ? proj.name.replace(/"/g, '""') : 'Unknown';
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    const projNames = pids.map(pid => {
+                        const p = this.projects.find(proj => proj.id === pid);
+                        return p ? p.name.replace(/"/g, '""') : 'Unknown';
+                    }).join(', ');
                     const name = e.name ? e.name.replace(/"/g, '""') : '';
                     const cat = e.job_category ? e.job_category.replace(/"/g, '""') : '';
                     
-                    csv += `"${pName}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}","${e.rounding_class || 'Rounding'}"\n`;
+                    csv += `"${projNames}","${e.emp_id || ''}","${name}","${cat}","${e.type || 'Regular'}","${e.cost_code_1 || ''}","${e.cost_code_2 || ''}","${e.rounding_class || 'Rounding'}"\n`;
                 });
 
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1958,14 +1986,22 @@
             },
 
             editEmployee(id) {
-                const emp = id ? this.employees.find(x => x.id === id) : { project_id: '', emp_id: '', name: '', job_category: '', type: 'Regular', payroll_item: 'Hourly', cost_code_1: '', cost_code_2: '', rounding_class: 'Rounding' };
-                const projOptions = this.projects.map(p => `<option value="${p.id}" ${p.id===emp.project_id?'selected':''}>${p.name}</option>`).join('');
+                const emp = id ? this.employees.find(x => x.id === id) : { project_ids: [], emp_id: '', name: '', job_category: '', type: 'Regular', payroll_item: 'Hourly', cost_code_1: '', cost_code_2: '', rounding_class: 'Rounding' };
+                const pids = emp.project_ids || (emp.project_id ? [emp.project_id] : []);
+                const projCheckboxes = this.projects.map(p => `
+                    <label class="flex items-center space-x-2 p-1 hover:bg-slate-100 rounded cursor-pointer">
+                        <input type="checkbox" name="emp_projects" value="${p.id}" ${pids.includes(p.id)?'checked':''} class="text-blue-600 focus:ring-blue-500 rounded border-slate-300">
+                        <span class="text-sm">${p.name}</span>
+                    </label>
+                `).join('');
 
                 this.showFormModal(id ? 'Edit Employee Data' : 'Add New Employee', `
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div class="col-span-2">
-                            <label class="block text-xs font-bold text-slate-500 uppercase">Assigned Project</label>
-                            <select id="fe-proj" class="w-full px-3 py-2 border rounded outline-none mt-1"><option value="">-- Select --</option>${projOptions}</select>
+                            <label class="block text-xs font-bold text-slate-500 uppercase">Assigned Projects</label>
+                            <div class="max-h-32 overflow-y-auto border border-slate-300 rounded p-2 space-y-1 bg-slate-50 mt-1">
+                                ${projCheckboxes}
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase">Employee ID</label>
@@ -2000,11 +2036,11 @@
                         </div>
                     </div>
                 `, async () => {
+                    const selectedProjects = Array.from(document.querySelectorAll('input[name="emp_projects"]:checked')).map(cb => cb.value);
                     const eId = document.getElementById('fe-eid').value.trim();
-                    const pId = document.getElementById('fe-proj').value;
                     const name = document.getElementById('fe-name').value.trim();
                     
-                    if(!eId || !pId || !name) return this.showModal('Error', 'Project, Employee ID, and Name are strictly required.');
+                    if(!eId || selectedProjects.length === 0 || !name) return this.showModal('Error', 'Project(s), Employee ID, and Name are strictly required.');
 
                     const submitBtn = document.getElementById('btn-modal-confirm');
                     const origText = submitBtn.innerText;
@@ -2014,7 +2050,7 @@
                     const safeId = eId.replace(/\W/g, ''); // Ensure safe document ID
                     try {
                         await setDoc(docPath('employees', safeId), {
-                            project_id: pId, emp_id: eId, name: name, 
+                            project_ids: selectedProjects, emp_id: eId, name: name, 
                             job_category: document.getElementById('fe-cat').value.trim(),
                             type: document.getElementById('fe-type').value,
                             rounding_class: document.getElementById('fe-round').value,
@@ -2221,7 +2257,7 @@
                             if (!safeEmpId) { skippedCount++; continue; }
                             const empRef = docPath('employees', safeEmpId);
                             batch.set(empRef, {
-                                project_id: projId, emp_id: eId, name: eName, 
+                                project_ids: arrayUnion(projId), emp_id: eId, name: eName, 
                                 job_category: jobCat || '', type: type, rounding_class: roundingClass, cost_code_1: cc1 || '', cost_code_2: cc2 || '', notes: notesRaw || ''
                             }, {merge: true});
                             hasWrites = true;
@@ -2366,7 +2402,10 @@
                 if(!this.activeProjectId) return;
                 const proj = this.projects.find(p => p.id === this.activeProjectId);
                 const todayStr = this.getTimesheetDateStr();
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                const emps = this.employees.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(this.activeProjectId);
+                }).sort((a,b) => a.name.localeCompare(b.name));
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees exist to print for this project.');
 
@@ -2555,7 +2594,10 @@
                 if(!this.activeProjectId) return this.showModal('Notice', 'Please select a project first.');
                 
                 const targetDateStr = this.getTimesheetDateStr();
-                const emps = this.employees.filter(e => e.project_id === this.activeProjectId).sort((a,b) => a.name.localeCompare(b.name));
+                const emps = this.employees.filter(e => {
+                    const pids = e.project_ids || (e.project_id ? [e.project_id] : []);
+                    return pids.includes(this.activeProjectId);
+                }).sort((a,b) => a.name.localeCompare(b.name));
                 
                 if(emps.length === 0) return this.showModal('Notice', 'No employees found for this project.');
 
